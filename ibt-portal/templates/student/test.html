@@ -1,0 +1,152 @@
+{% extends "base.html" %}
+{% block title %}{{ test.name }} — EPS IBT Portal{% endblock %}
+{% block page_title %}{{ test.name }}{% endblock %}
+{% block content %}
+{% if not questions %}
+<div style="text-align:center;padding:60px 20px;color:var(--ink3)">
+  <div style="font-size:2.5rem;margin-bottom:12px">📭</div>
+  <h3 style="font-size:1rem;font-weight:600;color:var(--ink2)">No questions added yet</h3>
+  <p style="font-size:.8rem;margin-top:4px">Your teacher will add questions to this test soon.</p>
+  <a href="/student" class="btn btn-secondary" style="margin-top:16px">← Go back</a>
+</div>
+{% else %}
+<div class="quiz-wrap">
+  <!-- Top bar -->
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+    <div>
+      <span class="badge badge-blue">{{ test.subject }}</span>
+      <span class="badge badge-purple" style="margin-left:4px">{{ test.grade }}</span>
+    </div>
+    <div id="timer" class="timer safe">⏱ {{ '%02d'|format(test.duration) }}:00</div>
+  </div>
+
+  <!-- Progress bar -->
+  <div class="progress" style="margin-bottom:20px;height:7px">
+    <div class="progress-fill" id="progBar" style="width:0%;background:var(--brand);transition:width .3s"></div>
+  </div>
+
+  <!-- Questions -->
+  {% for q in questions %}
+  <div class="quiz-q-block" id="q{{ loop.index0 }}" style="display:{% if loop.first %}block{% else %}none{% endif %}">
+    <div style="font-size:.65rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--brand);margin-bottom:6px">
+      {{ q.section }} · Question {{ loop.index }} of {{ questions|length }}
+    </div>
+    {% if q.passage %}
+    <div class="quiz-passage">{{ q.passage }}</div>
+    {% endif %}
+    <div class="quiz-q">{{ q.question }}</div>
+    {% for opt in q.options %}
+    <div class="quiz-opt" data-qid="{{ q.id }}" data-idx="{{ loop.index0 }}" onclick="selectOpt(this, {{ q.id }}, {{ loop.index0 }})">
+      <div class="opt-letter">{{ ['A','B','C','D'][loop.index0] }}</div>
+      {{ opt }}
+    </div>
+    {% endfor %}
+    <div style="display:flex;gap:8px;margin-top:16px">
+      {% if not loop.first %}<button class="btn btn-secondary" onclick="goTo({{ loop.index0 - 1 }})">← Prev</button>{% endif %}
+      {% if not loop.last %}
+        <button class="btn btn-primary" style="margin-left:auto" onclick="goTo({{ loop.index0 + 1 }})">Next →</button>
+      {% else %}
+        <button class="btn btn-primary" style="margin-left:auto" onclick="submitTest()">Submit Test ✓</button>
+      {% endif %}
+    </div>
+  </div>
+  {% endfor %}
+
+  <!-- Navigator -->
+  <div class="card" style="margin-top:20px">
+    <div style="font-size:.75rem;font-weight:600;margin-bottom:10px">Question Navigator</div>
+    <div style="display:flex;flex-wrap:wrap;gap:5px">
+      {% for q in questions %}
+      <div class="nav-q" id="nq{{ loop.index0 }}" onclick="goTo({{ loop.index0 }})"
+        style="width:32px;height:32px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:.72rem;font-weight:600;cursor:pointer;background:var(--surface2);color:var(--ink3)">
+        {{ loop.index }}
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+
+<!-- Result overlay -->
+<div id="resultOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:2000;align-items:center;justify-content:center">
+  <div style="background:#fff;border-radius:20px;padding:36px;max-width:480px;width:100%;text-align:center;margin:16px">
+    <div style="font-size:3rem;font-family:'Sora',sans-serif;font-weight:800" id="rScore"></div>
+    <div style="font-size:1rem;font-weight:600;margin:6px 0" id="rLabel"></div>
+    <div style="font-size:.8rem;color:var(--ink3);margin-bottom:20px" id="rMsg"></div>
+    <div id="rSections" style="text-align:left;margin-bottom:20px"></div>
+    <div style="display:flex;gap:8px;justify-content:center">
+      <a href="/student" class="btn btn-secondary">← Dashboard</a>
+      <a href="/student/scores" class="btn btn-primary">View All Scores</a>
+    </div>
+  </div>
+</div>
+
+{% endif %}
+{% endblock %}
+{% block scripts %}
+<script>
+const TOTAL = {{ questions|length }};
+const DURATION = {{ test.duration }} * 60;
+const TEST_ID = {{ test.id }};
+let current = 0, answers = {}, startTime = Date.now(), timeLeft = DURATION;
+
+// Timer
+const timerEl = document.getElementById('timer');
+const timerInterval = setInterval(()=>{
+  timeLeft--;
+  const m = Math.floor(timeLeft/60).toString().padStart(2,'0');
+  const s = (timeLeft%60).toString().padStart(2,'0');
+  timerEl.textContent = `⏱ ${m}:${s}`;
+  timerEl.className = 'timer ' + (timeLeft>120?'safe':timeLeft>30?'warn':'danger');
+  if(timeLeft<=0){ clearInterval(timerInterval); submitTest(); }
+},1000);
+
+function goTo(idx){
+  document.getElementById('q'+current).style.display='none';
+  current = idx;
+  document.getElementById('q'+current).style.display='block';
+  document.getElementById('progBar').style.width = ((current+1)/TOTAL*100)+'%';
+  updateNav();
+}
+
+function selectOpt(el, qid, idx){
+  document.querySelectorAll(`.quiz-opt[data-qid="${qid}"]`).forEach(o=>{ o.classList.remove('selected'); o.querySelector('.opt-letter').style.background=''; o.querySelector('.opt-letter').style.color=''; });
+  el.classList.add('selected');
+  el.querySelector('.opt-letter').style.background='var(--brand)';
+  el.querySelector('.opt-letter').style.color='#fff';
+  answers[qid] = idx;
+  document.getElementById('nq'+current).style.background='var(--brand-l)';
+  document.getElementById('nq'+current).style.color='var(--brand)';
+}
+
+function updateNav(){
+  for(let i=0;i<TOTAL;i++){
+    const el = document.getElementById('nq'+i);
+    if(i===current){ el.style.background='var(--brand)'; el.style.color='#fff'; }
+    else if(answers[Object.keys(answers)[i]] !== undefined){ el.style.background='var(--brand-l)'; el.style.color='var(--brand)'; }
+  }
+}
+
+function submitTest(){
+  clearInterval(timerInterval);
+  const timeTaken = Math.round((Date.now()-startTime)/1000);
+  fetch(`/student/submit/${TEST_ID}`,{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({answers, time_taken: timeTaken})
+  }).then(r=>r.json()).then(d=>{
+    const ov = document.getElementById('resultOverlay');
+    document.getElementById('rScore').textContent = d.percent+'%';
+    document.getElementById('rScore').style.color = d.percent>=80?'#10b981':d.percent>=60?'#f59e0b':'#ef4444';
+    document.getElementById('rLabel').textContent = `You scored ${d.score} out of ${d.total}`;
+    document.getElementById('rMsg').textContent = d.percent>=80?'🎉 Excellent work!':d.percent>=60?'👍 Good effort, keep practising!':'📚 Review your notes and try again.';
+    let secHtml = '';
+    for(const [sec,v] of Object.entries(d.section_scores)){
+      const p = Math.round(v.correct/v.total*100);
+      secHtml += `<div style="margin-bottom:8px"><div style="display:flex;justify-content:space-between;font-size:.78rem;margin-bottom:3px"><span>${sec}</span><span style="font-weight:700;color:${p>=80?'#10b981':p>=60?'#f59e0b':'#ef4444'}">${v.correct}/${v.total}</span></div><div style="height:5px;background:#e2e8f0;border-radius:3px"><div style="height:100%;width:${p}%;background:${p>=80?'#10b981':p>=60?'#f59e0b':'#ef4444'};border-radius:3px"></div></div></div>`;
+    }
+    document.getElementById('rSections').innerHTML = secHtml;
+    ov.style.display='flex';
+  });
+}
+</script>
+{% endblock %}

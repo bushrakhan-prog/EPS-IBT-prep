@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Eastern Public School — IBT Preparation Portal</title>
+<link rel="stylesheet" href="/static/style.css"/>
+<style>
+  body{display:flex;align-items:center;justify-content:center;min-height:100vh;background:linear-gradient(135deg,#0f172a 0%,#1e1b4b 50%,#0f172a 100%)}
+  .login-wrap{width:100%;max-width:400px;padding:16px}
+  .login-card{background:#fff;border-radius:20px;padding:36px 32px;box-shadow:0 24px 48px rgba(0,0,0,.3)}
+  .login-logo{text-align:center;margin-bottom:24px}
+  .school-crest{width:56px;height:56px;border-radius:14px;background:linear-gradient(135deg,#4f46e5,#6366f1);display:flex;align-items:center;justify-content:center;font-size:1.6rem;margin:0 auto 12px;box-shadow:0 8px 16px rgba(79,70,229,.3)}
+  .school-name{font-family:'Sora',sans-serif;font-size:1.15rem;font-weight:800;color:#0f172a;letter-spacing:-.01em}
+  .portal-tag{font-size:.78rem;color:#4f46e5;font-weight:600;margin-top:3px}
+  .login-title{font-family:'Sora',sans-serif;font-size:1.1rem;font-weight:700;text-align:center;margin-bottom:4px;margin-top:20px}
+  .footer-note{font-size:.7rem;color:#94a3b8;text-align:center;margin-top:20px}
+</style>
+</head>
+<body>
+<div class="login-wrap">
+  <div class="login-card">
+    <div class="login-logo">
+      <div class="school-crest">🎓</div>
+      <div class="school-name">Eastern Public School</div>
+      <div class="portal-tag">IBT Preparation Portal</div>
+    </div>
+    <div class="login-title">Welcome back</div>
+    <p style="font-size:.78rem;color:#64748b;text-align:center;margin-bottom:22px">Sign in with your school credentials</p>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% for cat, msg in messages %}
+        <div class="alert alert-{{ 'success' if cat=='success' else 'error' }}" style="margin-bottom:14px">{{ msg }}</div>
+      {% endfor %}
+    {% endwith %}
+
+    <form method="POST" autocomplete="off">
+      <div class="form-group">
+        <label class="form-label">Username</label>
+        <input class="form-input" name="username" placeholder="Enter your username" required
+               autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false"
+               value="" id="username-field"/>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Password</label>
+        <input class="form-input" type="password" name="password" placeholder="Enter your password" required
+               autocomplete="new-password" id="password-field" value=""/>
+      </div>
+      <button type="submit" class="btn btn-primary" style="width:100%;justify-content:center;padding:10px;font-size:.875rem;margin-top:4px">Sign In →</button>
+    </form>
+
+    <p class="footer-note">Contact your school administrator if you forgot your login details.</p>
+  </div>
+</div>
+<script>
+  // Force-clear any browser autofill on page load
+  window.addEventListener('DOMContentLoaded', function(){
+    document.getElementById('username-field').value = '';
+    document.getElementById('password-field').value = '';
+    setTimeout(function(){
+      document.getElementById('username-field').value = '';
+      document.getElementById('password-field').value = '';
+    }, 100);
+  });
+</script>
+</body>
+</html>

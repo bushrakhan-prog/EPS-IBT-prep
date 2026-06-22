@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block title %}Students — EPS IBT Portal{% endblock %}
+{% block page_title %}Students{% endblock %}
+{% block back_button %}<a href="/teacher" class="back-btn">← Back</a>{% endblock %}
+{% block content %}
+<div class="sec-header"><div class="sec-title">All Students</div></div>
+<div class="table-wrap">
+<table>
+  <thead><tr><th>Name</th><th>Grade</th><th>Section</th><th>Tests Taken</th><th>Average</th><th>Status</th></tr></thead>
+  <tbody>
+    {% for d in student_data %}
+    <tr>
+      <td style="font-weight:600">{{ d.student.name }}</td>
+      <td><span class="badge badge-purple">{{ d.student.grade }}</span></td>
+      <td>{{ d.student.section or '—' }}</td>
+      <td><span class="badge badge-blue">{{ d.tests_taken }}</span></td>
+      <td><span style="font-weight:700;color:{% if d.avg>=80 %}var(--green){% elif d.avg>=60 %}var(--amber){% elif d.avg>0 %}var(--red){% else %}var(--ink4){% endif %}">{% if d.tests_taken %}{{ d.avg }}%{% else %}—{% endif %}</span></td>
+      <td>{% if d.avg>=80 %}<span class="badge badge-green">Excellent</span>{% elif d.avg>=60 %}<span class="badge badge-amber">Good</span>{% elif d.tests_taken %}<span class="badge badge-red">Needs Support</span>{% else %}<span class="badge badge-gray">No tests</span>{% endif %}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+</div>
+{% endblock %}

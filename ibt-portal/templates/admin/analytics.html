@@ -1,0 +1,268 @@
+{% extends "base.html" %}
+{% block title %}Analytics — EPS IBT Portal{% endblock %}
+{% block page_title %}Analytics{% endblock %}
+{% block back_button %}<a href="/admin" class="back-btn">← Back</a>{% endblock %}
+{% block content %}
+
+<!-- Top stats -->
+<div class="stat-grid" style="margin-bottom:20px">
+  <div class="stat-card"><div class="stat-icon" style="background:#eef2ff">📊</div><div class="stat-value">{{ overall_avg }}%</div><div class="stat-label">Overall Average</div></div>
+  <div class="stat-card"><div class="stat-icon" style="background:#ecfdf5">🏆</div><div class="stat-value">{{ above80 }}</div><div class="stat-label">Scoring 80%+</div></div>
+  <div class="stat-card"><div class="stat-icon" style="background:#fef2f2">⚠️</div><div class="stat-value">{{ below60 }}</div><div class="stat-label">Below 60%</div></div>
+  <div class="stat-card"><div class="stat-icon" style="background:#fffbeb">✅</div><div class="stat-value">{{ total_results }}</div><div class="stat-label">Total Submissions</div></div>
+</div>
+
+<!-- Analysis tabs -->
+<div class="tab-bar" style="max-width:600px;margin-bottom:20px">
+  <button class="tab-btn active" onclick="showTab('overall',this)">Overall</button>
+  <button class="tab-btn" onclick="showTab('grade',this)">Grade-wise</button>
+  <button class="tab-btn" onclick="showTab('subject',this)">Subject-wise</button>
+  <button class="tab-btn" onclick="showTab('section',this)">Section-wise</button>
+  <button class="tab-btn" onclick="showTab('students',this)">Per Student</button>
+</div>
+
+<!-- OVERALL TAB -->
+<div id="tab-overall">
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
+    <div class="card">
+      <div class="card-title">Overall Grade Comparison</div>
+      <canvas id="overallGrade" height="200"></canvas>
+    </div>
+    <div class="card">
+      <div class="card-title">Score Distribution</div>
+      <canvas id="overallDist" height="200"></canvas>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-title">Subject Performance — All Grades</div>
+    <canvas id="overallSubject" height="160"></canvas>
+  </div>
+</div>
+
+<!-- GRADE TAB -->
+<div id="tab-grade" style="display:none">
+  <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:16px">
+    {% for g in grades %}
+    {% set gd = grade_data[g] %}
+    <div class="card" style="text-align:center">
+      <div style="font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--ink3);margin-bottom:8px">{{ g }}</div>
+      <div style="font-family:'Sora',sans-serif;font-size:2rem;font-weight:800;color:{% if gd.avg>=80 %}var(--green){% elif gd.avg>=60 %}var(--amber){% else %}var(--red){% endif %}">{{ gd.avg }}%</div>
+      <div style="font-size:.72rem;color:var(--ink3);margin-top:4px">{{ gd.students }} students · {{ gd.count }} submissions</div>
+    </div>
+    {% endfor %}
+  </div>
+  <div class="card" style="margin-bottom:16px">
+    <div class="card-title">Grade × Subject Performance</div>
+    <canvas id="gradeSubjectChart" height="200"></canvas>
+  </div>
+  <div class="card">
+    <div class="card-title">Grade-wise Student List</div>
+    {% for g in grades %}
+    <div style="margin-bottom:18px">
+      <div style="font-size:.75rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--brand);margin-bottom:8px;padding-bottom:6px;border-bottom:2px solid var(--brand-l)">{{ g }}</div>
+      <div class="table-wrap">
+      <table>
+        <thead><tr><th>Student</th><th>Section</th>{% for s in subjects %}<th>{{ s[:4] }}.</th>{% endfor %}<th>Overall</th></tr></thead>
+        <tbody>
+          {% for d in student_rows if d.grade == g %}
+          <tr>
+            <td style="font-weight:500">{{ d.name }}</td>
+            <td>{{ d.section or '—' }}</td>
+            {% for s in subjects %}
+            <td><span style="font-weight:600;color:{% if d.sub_avgs[s]>=80 %}var(--green){% elif d.sub_avgs[s]>=60 %}var(--amber){% elif d.sub_avgs[s]>0 %}var(--red){% else %}var(--ink4){% endif %}">{% if d.sub_avgs[s]>0 %}{{ d.sub_avgs[s] }}%{% else %}—{% endif %}</span></td>
+            {% endfor %}
+            <td><span style="font-weight:700;color:{% if d.overall_avg>=80 %}var(--green){% elif d.overall_avg>=60 %}var(--amber){% elif d.overall_avg>0 %}var(--red){% else %}var(--ink4){% endif %}">{% if d.overall_avg>0 %}{{ d.overall_avg }}%{% else %}—{% endif %}</span></td>
+          </tr>
+          {% else %}
+          <tr><td colspan="{{ subjects|length + 3 }}" style="text-align:center;color:var(--ink4)">No data</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+
+<!-- SUBJECT TAB -->
+<div id="tab-subject" style="display:none">
+  <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px">
+    {% for s in subjects %}
+    {% set sd = subject_data[s] %}
+    <div class="card" style="border-top:3px solid {% if loop.index==1 %}#3b82f6{% elif loop.index==2 %}#10b981{% elif loop.index==3 %}#f59e0b{% else %}#8b5cf6{% endif %}">
+      <div style="font-size:.8rem;font-weight:600;margin-bottom:6px">{{ s }}</div>
+      <div style="font-family:'Sora',sans-serif;font-size:1.7rem;font-weight:800;color:{% if sd.avg>=80 %}var(--green){% elif sd.avg>=60 %}var(--amber){% elif sd.avg>0 %}var(--red){% else %}var(--ink4){% endif %}">{% if sd.avg>0 %}{{ sd.avg }}%{% else %}—{% endif %}</div>
+      <div style="font-size:.7rem;color:var(--ink3);margin-top:3px">{{ sd.count }} submissions</div>
+    </div>
+    {% endfor %}
+  </div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+    <div class="card">
+      <div class="card-title">Subject Average Comparison</div>
+      <canvas id="subjectBar" height="200"></canvas>
+    </div>
+    <div class="card">
+      <div class="card-title">Subject × Grade Heatmap</div>
+      <div style="overflow-x:auto">
+      <table style="width:100%">
+        <thead><tr><th>Subject</th>{% for g in grades %}<th>{{ g }}</th>{% endfor %}</tr></thead>
+        <tbody>
+          {% for sub in subjects %}
+          <tr>
+            <td style="font-weight:600">{{ sub }}</td>
+            {% for g in grades %}
+            {% set val = grade_subject[g][sub] %}
+            <td>
+              <div style="background:{% if val>=80 %}#ecfdf5{% elif val>=60 %}#fffbeb{% elif val>0 %}#fef2f2{% else %}#f8fafc{% endif %};color:{% if val>=80 %}var(--green){% elif val>=60 %}var(--amber){% elif val>0 %}var(--red){% else %}var(--ink4){% endif %};font-weight:700;padding:6px 8px;border-radius:6px;text-align:center;font-size:.82rem">{% if val>0 %}{{ val }}%{% else %}—{% endif %}</div>
+            </td>
+            {% endfor %}
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- SECTION TAB -->
+<div id="tab-section" style="display:none">
+  {% if section_avgs %}
+  <div class="card" style="margin-bottom:16px">
+    <div class="card-title">Section-wise Performance (from submitted tests)</div>
+    <canvas id="sectionBar" height="200"></canvas>
+  </div>
+  <div class="card">
+    <div class="card-title">Section Scores — Detail</div>
+    <div class="table-wrap">
+    <table>
+      <thead><tr><th>Section</th><th>Average Score</th><th>Performance</th></tr></thead>
+      <tbody>
+        {% for sec, avg in section_avgs.items()|sort(attribute='1', reverse=True) %}
+        <tr>
+          <td style="font-weight:500">{{ sec }}</td>
+          <td><span style="font-weight:700;color:{% if avg>=80 %}var(--green){% elif avg>=60 %}var(--amber){% else %}var(--red){% endif %}">{{ avg }}%</span></td>
+          <td style="min-width:140px">
+            <div class="progress"><div class="progress-fill" style="width:{{ avg }}%;background:{% if avg>=80 %}var(--green){% elif avg>=60 %}var(--amber){% else %}var(--red){% endif %}"></div></div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    </div>
+  </div>
+  {% else %}
+  <div class="card" style="text-align:center;padding:40px;color:var(--ink3)">
+    <div style="font-size:2rem">📭</div>
+    <p style="margin-top:8px;font-size:.85rem">No section data yet — this view populates once students start submitting tests with questions.</p>
+  </div>
+  {% endif %}
+</div>
+
+<!-- PER STUDENT TAB -->
+<div id="tab-students" style="display:none">
+  <div class="card">
+    <div class="sec-header">
+      <div class="sec-title">All Students — Full Breakdown</div>
+      <div style="font-size:.75rem;color:var(--ink3)">Sorted by overall average ↓</div>
+    </div>
+    <div class="table-wrap">
+    <table>
+      <thead><tr><th>#</th><th>Student</th><th>Grade</th><th>Sec</th><th>Tests</th>{% for s in subjects %}<th>{{ s[:4] }}.</th>{% endfor %}<th>Overall</th><th>Status</th></tr></thead>
+      <tbody>
+        {% for d in student_rows %}
+        <tr>
+          <td style="color:var(--ink4);font-size:.75rem">{{ loop.index }}</td>
+          <td style="font-weight:600">{{ d.name }}</td>
+          <td><span class="badge badge-purple">{{ d.grade }}</span></td>
+          <td>{{ d.section or '—' }}</td>
+          <td><span class="badge badge-blue">{{ d.tests_taken }}</span></td>
+          {% for s in subjects %}
+          <td><span style="font-weight:600;color:{% if d.sub_avgs[s]>=80 %}var(--green){% elif d.sub_avgs[s]>=60 %}var(--amber){% elif d.sub_avgs[s]>0 %}var(--red){% else %}var(--ink4){% endif %}">{% if d.sub_avgs[s]>0 %}{{ d.sub_avgs[s] }}%{% else %}—{% endif %}</span></td>
+          {% endfor %}
+          <td>
+            <div style="display:flex;align-items:center;gap:6px">
+              <div class="progress" style="width:55px"><div class="progress-fill" style="width:{{ d.overall_avg }}%;background:{% if d.overall_avg>=80 %}var(--green){% elif d.overall_avg>=60 %}var(--amber){% else %}var(--red){% endif %}"></div></div>
+              <span style="font-weight:700;color:{% if d.overall_avg>=80 %}var(--green){% elif d.overall_avg>=60 %}var(--amber){% elif d.overall_avg>0 %}var(--red){% else %}var(--ink4){% endif %}">{% if d.overall_avg>0 %}{{ d.overall_avg }}%{% else %}—{% endif %}</span>
+            </div>
+          </td>
+          <td>{% if d.overall_avg>=80 %}<span class="badge badge-green">Excellent</span>{% elif d.overall_avg>=60 %}<span class="badge badge-amber">Good</span>{% elif d.overall_avg>0 %}<span class="badge badge-red">Needs Help</span>{% else %}<span class="badge badge-gray">No tests</span>{% endif %}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+{% block scripts %}
+<script>
+const GRADES   = {{ grades | tojson }};
+const SUBJECTS = {{ subjects | tojson }};
+const gradeData   = {{ grade_data | tojson }};
+const subjectData = {{ subject_data | tojson }};
+const gradeSubj   = {{ grade_subject | tojson }};
+const sectionAvgs = {{ section_avgs | tojson }};
+
+// Overall: grade bar
+new Chart(document.getElementById('overallGrade'),{
+  type:'bar',
+  data:{labels:GRADES,datasets:[{label:'Avg %',data:GRADES.map(g=>gradeData[g]?.avg||0),backgroundColor:['#4f46e5bb','#10b981bb','#f59e0bbb'],borderRadius:6,borderSkipped:false}]},
+  options:{responsive:true,maintainAspectRatio:true,aspectRatio:2,plugins:{legend:{display:false}},scales:{y:{min:0,max:100,grid:{color:'#f1f5f9'},ticks:{font:{size:10}}},x:{grid:{display:false},ticks:{font:{size:10}}}}}
+});
+
+// Overall: distribution doughnut
+const above80 = {{ above80 }}, total_s = {{ total_students }}, below60 = {{ below60 }};
+const mid = total_s - above80 - below60;
+new Chart(document.getElementById('overallDist'),{
+  type:'doughnut',
+  data:{labels:['Excellent (80+)','Good (60-79)','Needs Help (<60)'],datasets:[{data:[above80, mid < 0 ? 0 : mid, below60],backgroundColor:['#10b981','#f59e0b','#ef4444'],borderWidth:0}]},
+  options:{responsive:true,maintainAspectRatio:true,aspectRatio:2,cutout:'60%',plugins:{legend:{position:'right',labels:{font:{size:10},boxWidth:10}}}}
+});
+
+// Overall: subject bar
+new Chart(document.getElementById('overallSubject'),{
+  type:'bar',
+  data:{labels:SUBJECTS,datasets:[{label:'Avg %',data:SUBJECTS.map(s=>subjectData[s]?.avg||0),backgroundColor:['#3b82f6bb','#10b981bb','#f59e0bbb','#8b5cf6bb'],borderRadius:6,borderSkipped:false}]},
+  options:{responsive:true,maintainAspectRatio:true,aspectRatio:3,plugins:{legend:{display:false}},scales:{y:{min:0,max:100,grid:{color:'#f1f5f9'},ticks:{font:{size:10}}},x:{grid:{display:false},ticks:{font:{size:10}}}}}
+});
+
+// Grade × Subject grouped bar
+new Chart(document.getElementById('gradeSubjectChart'),{
+  type:'bar',
+  data:{labels:GRADES,datasets:SUBJECTS.map((s,i)=>({
+    label:s,
+    data:GRADES.map(g=>gradeSubj[g]?.[s]||0),
+    backgroundColor:['#3b82f6bb','#10b981bb','#f59e0bbb','#8b5cf6bb'][i],
+    borderRadius:4,borderSkipped:false
+  }))},
+  options:{responsive:true,maintainAspectRatio:true,aspectRatio:2,plugins:{legend:{position:'top',labels:{font:{size:10},boxWidth:10}}},scales:{y:{min:0,max:100,grid:{color:'#f1f5f9'},ticks:{font:{size:10}}},x:{grid:{display:false},ticks:{font:{size:10}}}}}
+});
+
+// Subject bar
+new Chart(document.getElementById('subjectBar'),{
+  type:'bar',
+  data:{labels:SUBJECTS,datasets:[{label:'Avg %',data:SUBJECTS.map(s=>subjectData[s]?.avg||0),backgroundColor:['#3b82f6bb','#10b981bb','#f59e0bbb','#8b5cf6bb'],borderRadius:6,borderSkipped:false}]},
+  options:{responsive:true,maintainAspectRatio:true,aspectRatio:2,plugins:{legend:{display:false}},scales:{y:{min:0,max:100,grid:{color:'#f1f5f9'},ticks:{font:{size:10}}},x:{grid:{display:false},ticks:{font:{size:10}}}}}
+});
+
+// Section bar
+if(Object.keys(sectionAvgs).length){
+  const sl = Object.keys(sectionAvgs), sv = Object.values(sectionAvgs);
+  new Chart(document.getElementById('sectionBar'),{
+    type:'bar',
+    data:{labels:sl,datasets:[{label:'Avg %',data:sv,backgroundColor:sv.map(v=>v>=80?'#10b981bb':v>=60?'#f59e0bbb':'#ef4444bb'),borderRadius:6,borderSkipped:false}]},
+    options:{responsive:true,maintainAspectRatio:true,aspectRatio:2.5,plugins:{legend:{display:false}},scales:{y:{min:0,max:100,grid:{color:'#f1f5f9'},ticks:{font:{size:10}}},x:{grid:{display:false},ticks:{font:{size:10},maxRotation:30}}}}
+  });
+}
+
+function showTab(id, btn){
+  ['overall','grade','subject','section','students'].forEach(t=>{
+    document.getElementById('tab-'+t).style.display = t===id?'block':'none';
+  });
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+}
+</script>
+{% endblock %}
