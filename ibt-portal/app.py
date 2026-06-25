@@ -151,7 +151,7 @@ def build_analytics():
 def seed_db():
     if User.query.filter_by(username='Resource_Manager').first():
         return
-    db.session.add(User(name='Resource_Manager', username='Resource_Manage',
+    db.session.add(User(name='Resource_Manager', username='Organizer',
         password=generate_password_hash('bk*123'), role='Resource_Manager'))
     for name, uname in [('Mrs. Sharma','teacher1'),('Mr. Verma','teacher2')]:
         db.session.add(User(name=name, username=uname,
