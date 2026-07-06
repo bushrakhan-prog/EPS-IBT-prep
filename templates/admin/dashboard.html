@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% block title %}Dashboard — EPS IBT Portal{% endblock %}
+{% block page_title %}Dashboard{% endblock %}
+{% block content %}
+<div class="stat-grid">
+  <div class="stat-card"><div class="stat-icon" style="background:#eef2ff">👨‍🎓</div><div class="stat-value">{{ students|length }}</div><div class="stat-label">Total Students</div></div>
+  <div class="stat-card"><div class="stat-icon" style="background:#ecfdf5">📝</div><div class="stat-value">{{ tests|selectattr('status','eq','active')|list|length }}</div><div class="stat-label">Active Tests</div></div>
+  <div class="stat-card"><div class="stat-icon" style="background:#fffbeb">📊</div><div class="stat-value">{{ avg_score }}%</div><div class="stat-label">Class Average</div></div>
+  <div class="stat-card"><div class="stat-icon" style="background:#f5f3ff">✅</div><div class="stat-value">{{ results|length }}</div><div class="stat-label">Tests Submitted</div></div>
+</div>
+
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
+  <div class="card">
+    <div class="card-title">Score by Grade</div>
+    <canvas id="gradeChart" height="180"></canvas>
+  </div>
+  <div class="card">
+    <div class="card-title">Score by Subject</div>
+    <canvas id="subjectChart" height="180"></canvas>
+  </div>
+</div>
+
+<div class="card">
+  <div class="sec-header">
+    <div class="sec-title">Recent Submissions</div>
+    <a href="/admin/analytics" class="btn btn-secondary btn-sm">View analytics →</a>
+  </div>
+  {% if recent %}
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Student</th><th>Test</th><th>Subject</th><th>Score</th><th>Date</th></tr></thead>
+    <tbody>
+      {% for r in recent %}
+      <tr>
+        <td style="font-weight:500">{{ r.student.name }}</td>
+        <td style="color:var(--ink3)">{{ r.test.name }}</td>
+        <td><span class="badge badge-blue">{{ r.test.subject }}</span></td>
+        <td><span style="font-weight:700;color:{% if r.percent>=80 %}var(--green){% elif r.percent>=60 %}var(--amber){% else %}var(--red){% endif %}">{{ r.percent }}%</span></td>
+        <td style="color:var(--ink4)">{{ r.taken_at.strftime('%d %b') }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  {% else %}
+  <p style="color:var(--ink3);text-align:center;padding:24px 0;font-size:.8rem">No submissions yet. Students will appear here after taking their first test.</p>
+  {% endif %}
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+fetch('/api/analytics').then(r=>r.json()).then(d=>{
+  new Chart(document.getElementById('gradeChart'),{
+    type:'bar',
+    data:{labels:Object.keys(d),datasets:[{label:'Avg %',data:Object.values(d),backgroundColor:'#4f46e5bb',borderRadius:6,borderSkipped:false}]},
+    options:{responsive:true,maintainAspectRatio:true,aspectRatio:2,plugins:{legend:{display:false}},scales:{y:{min:0,max:100,grid:{color:'#f1f5f9'},ticks:{font:{size:10}}},x:{grid:{display:false},ticks:{font:{size:10}}}}}
+  });
+});
+const subjectData = {{ subject_data | tojson if subject_data is defined else '{}' }};
+</script>
+{% endblock %}

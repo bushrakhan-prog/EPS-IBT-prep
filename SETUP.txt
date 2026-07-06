@@ -1,0 +1,70 @@
+# IBT Portal — Setup Guide
+# ================================================
+# Run these commands ONE BY ONE in your terminal
+# ================================================
+
+# STEP 1 — Install Python (if not installed)
+# Download from: https://www.python.org/downloads/
+# Make sure to check "Add Python to PATH" during install
+
+# STEP 2 — Open terminal in the ibt-portal folder
+# Windows: Right-click the folder → "Open in Terminal"
+# Mac: Right-click → "New Terminal at Folder"
+
+# STEP 3 — Install required packages
+pip install -r requirements.txt
+
+# STEP 4 — Run the server
+python app.py
+
+# You will see:
+# ✅ Database seeded.
+# 🎯 IBT Portal running → http://localhost:5000
+#    Admin login   → username: admin    | password: admin123
+#    Teacher login → username: teacher1 | password: teacher123
+#    Student login → username: aarav    | password: student123
+
+# STEP 5 — Open in browser
+# Go to: http://localhost:5000
+
+# ================================================
+# TO ALLOW HOME ACCESS (students from their homes)
+# ================================================
+# Install ngrok: https://ngrok.com/download (free)
+# In a NEW terminal window, run:
+#   ngrok http 5000
+# You'll get a URL like: https://abc123.ngrok.io
+# Share this URL with students — they can open it from any device!
+# Keep BOTH terminals (app.py and ngrok) running.
+
+# ================================================
+# FOLDER STRUCTURE
+# ================================================
+# ibt-portal/
+# ├── app.py              ← Main server (run this)
+# ├── requirements.txt    ← Python packages
+# ├── database.db         ← Auto-created on first run
+# ├── static/
+# │   ├── style.css
+# │   └── app.js
+# ├── templates/
+# │   ├── base.html
+# │   ├── login.html
+# │   ├── admin/          ← Admin pages
+# │   ├── teacher/        ← Teacher pages
+# │   └── student/        ← Student pages
+# └── SETUP.txt           ← This file
+
+# ================================================
+# LOGINS SUMMARY
+# ================================================
+# Role      Username    Password
+# ------    --------    --------
+# Admin     admin       admin123
+# Teacher   teacher1    teacher123
+# Teacher   teacher2    teacher123
+# Student   aarav       student123
+# Student   priya       student123
+# (+ 6 more sample students)
+
+# Change passwords after first login via Admin → Students

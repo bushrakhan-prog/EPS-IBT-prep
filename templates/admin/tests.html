@@ -1,0 +1,87 @@
+{% extends "base.html" %}
+{% block title %}Mock Tests — EPS IBT Portal{% endblock %}
+{% block page_title %}Mock Tests{% endblock %}
+{% block back_button %}<a href="/admin" class="back-btn">← Back</a>{% endblock %}
+{% block content %}
+<div class="sec-header">
+  <div><div class="sec-title">Mock Test Papers</div><div class="sec-sub">{{ tests|length }} total</div></div>
+  <button class="btn btn-primary" onclick="document.getElementById('addModal').style.display='flex'">+ Create Test</button>
+</div>
+<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px">
+{% for t in tests %}
+{% set qs = t.questions|from_json %}
+<div class="card" style="border-top:3px solid {% if t.subject=='English' %}#3b82f6{% elif t.subject=='Mathematics' %}#10b981{% elif t.subject=='Science' %}#f59e0b{% else %}#8b5cf6{% endif %}">
+  <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px">
+    <div style="font-weight:600;font-size:.875rem;flex:1;padding-right:8px;line-height:1.3">{{ t.name }}</div>
+    <span class="badge {{ 'badge-green' if t.status=='active' else 'badge-amber' }}">{{ t.status }}</span>
+  </div>
+  <div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:12px">
+    <span class="badge badge-blue">{{ t.subject }}</span>
+    <span class="badge badge-purple">{{ t.grade }}</span>
+    <span class="badge {{ 'badge-green' if t.difficulty=='Easy' else ('badge-amber' if t.difficulty=='Medium' else 'badge-red') }}">{{ t.difficulty }}</span>
+  </div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px">
+    <div style="background:var(--surface2);border-radius:7px;padding:7px 10px">
+      <div style="font-size:.62rem;color:var(--ink3)">📝 Questions</div>
+      <div style="font-weight:700;font-size:.875rem">{{ qs|length }}</div>
+    </div>
+    <div style="background:var(--surface2);border-radius:7px;padding:7px 10px">
+      <div style="font-size:.62rem;color:var(--ink3)">⏱ Duration</div>
+      <div style="font-weight:700;font-size:.875rem">{{ t.duration }} min</div>
+    </div>
+  </div>
+  <div style="display:flex;gap:5px">
+    <a href="/admin/tests/{{ t.id }}/questions" class="btn btn-secondary btn-sm" style="flex:1;justify-content:center">✏️ Questions</a>
+    <form method="POST" style="display:inline">
+      <input type="hidden" name="action" value="toggle"/>
+      <input type="hidden" name="test_id" value="{{ t.id }}"/>
+      <button type="submit" class="btn btn-sm {{ 'btn-danger' if t.status=='active' else 'btn-success' }}">{{ '⏸' if t.status=='active' else '▶' }}</button>
+    </form>
+    <form method="POST" style="display:inline" onsubmit="return confirm('Delete this test?')">
+      <input type="hidden" name="action" value="delete"/>
+      <input type="hidden" name="test_id" value="{{ t.id }}"/>
+      <button type="submit" class="btn btn-danger btn-sm">🗑</button>
+    </form>
+  </div>
+</div>
+{% else %}
+<div style="grid-column:1/-1;text-align:center;padding:48px;color:var(--ink3)">
+  <div style="font-size:2rem">📝</div>
+  <p style="margin-top:8px;font-size:.85rem">No tests yet. Create your first test above.</p>
+</div>
+{% endfor %}
+</div>
+
+<div class="modal-backdrop" id="addModal" style="display:none" onclick="if(event.target===this)this.style.display='none'">
+  <div class="modal">
+    <div class="modal-title">Create Mock Test <button class="modal-close" onclick="document.getElementById('addModal').style.display='none'">✕</button></div>
+    <form method="POST">
+      <input type="hidden" name="action" value="add"/>
+      <div class="form-group"><label class="form-label">Test Name</label><input class="form-input" name="name" placeholder="e.g. IBT English Set 3" required/></div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Subject</label>
+          <select class="form-input" name="subject">{% for s in subjects %}<option>{{ s }}</option>{% endfor %}</select>
+        </div>
+        <div class="form-group"><label class="form-label">Grade</label>
+          <select class="form-input" name="grade">{% for g in grades %}<option>{{ g }}</option>{% endfor %}</select>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Difficulty</label>
+          <select class="form-input" name="difficulty"><option>Easy</option><option selected>Medium</option><option>Hard</option></select>
+        </div>
+        <div class="form-group"><label class="form-label">Duration (min)</label>
+          <input class="form-input" type="number" name="duration" value="40" min="10" max="120"/>
+        </div>
+      </div>
+      <div class="form-group"><label class="form-label">Status</label>
+        <select class="form-input" name="status"><option value="draft">Draft — not visible to students</option><option value="active">Active — students can take this</option></select>
+      </div>
+      <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:8px">
+        <button type="button" class="btn btn-secondary" onclick="document.getElementById('addModal').style.display='none'">Cancel</button>
+        <button type="submit" class="btn btn-primary">Create Test</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

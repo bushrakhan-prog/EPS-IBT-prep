@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+{% block title %}Questions — {{ test.name }}{% endblock %}
+{% block page_title %}{{ test.name }}{% endblock %}
+{% block back_button %}<a href="/admin/tests" class="back-btn">← Tests</a>{% endblock %}
+{% block content %}
+<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px">
+  <span class="badge badge-blue">{{ test.subject }}</span>
+  <span class="badge badge-purple">{{ test.grade }}</span>
+  <span class="badge {{ 'badge-green' if test.status=='active' else 'badge-amber' }}">{{ test.status }}</span>
+  <span class="badge badge-gray">{{ questions|length }} questions</span>
+</div>
+
+<div style="display:grid;grid-template-columns:1fr 380px;gap:20px;align-items:start">
+  <div>
+    <div class="sec-title" style="margin-bottom:14px">Question List</div>
+    {% for q in questions %}
+    <div class="card" style="margin-bottom:10px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+        <div style="display:flex;align-items:center;gap:8px">
+          <span style="width:24px;height:24px;border-radius:6px;background:var(--brand-l);color:var(--brand);font-size:.72rem;font-weight:700;display:inline-flex;align-items:center;justify-content:center">{{ loop.index }}</span>
+          <span class="badge badge-gray">{{ q.section }}</span>
+        </div>
+        <form method="POST" action="/admin/questions/delete/{{ test.id }}/{{ q.id }}" onsubmit="return confirm('Delete this question?')">
+          <button type="submit" class="btn btn-danger btn-xs">Delete</button>
+        </form>
+      </div>
+      {% if q.passage %}
+      <div style="background:var(--surface2);border-left:2px solid var(--brand);padding:8px 10px;border-radius:0 6px 6px 0;font-size:.75rem;color:var(--ink3);margin-bottom:8px;line-height:1.5">{{ q.passage[:200] }}{% if q.passage|length>200 %}…{% endif %}</div>
+      {% endif %}
+      <div style="font-weight:500;font-size:.82rem;margin-bottom:8px;color:var(--ink)">{{ q.question }}</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px">
+        {% for opt in q.options %}
+        <div style="padding:5px 8px;border-radius:5px;font-size:.75rem;background:{% if loop.index0==q.answer %}var(--green-l){% else %}var(--surface2){% endif %};color:{% if loop.index0==q.answer %}var(--green){% else %}var(--ink3){% endif %};font-weight:{% if loop.index0==q.answer %}600{% else %}400{% endif %}">
+          {{ ['A','B','C','D'][loop.index0] }}. {{ opt }}{% if loop.index0==q.answer %} ✓{% endif %}
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+    {% else %}
+    <div style="text-align:center;padding:40px;color:var(--ink3)">
+      <div style="font-size:2rem;margin-bottom:8px">📝</div>
+      <p style="font-size:.85rem">No questions yet — add your first one using the form on the right.</p>
+    </div>
+    {% endfor %}
+  </div>
+
+  <!-- Add question form -->
+  <div style="position:sticky;top:70px">
+    <div class="card">
+      <div class="card-title">Add Question</div>
+      <form method="POST">
+        <div class="form-group">
+          <label class="form-label">Section</label>
+          <select class="form-input" name="section">
+            {% for sec in subject_sections %}<option>{{ sec }}</option>{% endfor %}
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Passage <span style="color:var(--ink4)">(optional)</span></label>
+          <textarea class="form-input" name="passage" rows="3" placeholder="Paste reading passage here if needed…" style="resize:vertical"></textarea>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Question</label>
+          <textarea class="form-input" name="question" rows="2" required style="resize:vertical" placeholder="Type the question…"></textarea>
+        </div>
+        {% for letter in ['A','B','C','D'] %}
+        <div class="form-group">
+          <label class="form-label">Option {{ letter }}</label>
+          <input class="form-input" name="opt{{ loop.index0 }}" placeholder="Option {{ letter }}" required/>
+        </div>
+        {% endfor %}
+        <div class="form-group">
+          <label class="form-label">Correct Answer</label>
+          <select class="form-input" name="answer">
+            <option value="0">A</option><option value="1">B</option><option value="2">C</option><option value="3">D</option>
+          </select>
+        </div>
+        <button type="submit" class="btn btn-primary" style="width:100%;justify-content:center">+ Add Question</button>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

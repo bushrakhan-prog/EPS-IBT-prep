@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block title %}Teacher Dashboard — EPS IBT Portal{% endblock %}
+{% block page_title %}Dashboard{% endblock %}
+{% block content %}
+<div class="stat-grid">
+  <div class="stat-card"><div class="stat-icon" style="background:#eef2ff">👨‍🎓</div><div class="stat-value">{{ students|length }}</div><div class="stat-label">Students</div></div>
+  <div class="stat-card"><div class="stat-icon" style="background:#ecfdf5">📝</div><div class="stat-value">{{ tests|length }}</div><div class="stat-label">Active Tests</div></div>
+  <div class="stat-card"><div class="stat-icon" style="background:#fffbeb">✅</div><div class="stat-value">{{ results|length }}</div><div class="stat-label">Submissions</div></div>
+  <div class="stat-card"><div class="stat-icon" style="background:#f5f3ff">📊</div><div class="stat-value">{{ avg_score }}%</div><div class="stat-label">Class Average</div></div>
+</div>
+<div class="card">
+  <div class="sec-header"><div class="sec-title">Recent Submissions</div><a href="/teacher/analytics" class="btn btn-secondary btn-sm">Analytics →</a></div>
+  {% if recent %}
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Student</th><th>Test</th><th>Score</th><th>Date</th></tr></thead>
+    <tbody>
+      {% for r in recent %}
+      <tr>
+        <td style="font-weight:500">{{ r.student.name }}</td>
+        <td style="color:var(--ink3)">{{ r.test.name }}</td>
+        <td><span style="font-weight:700;color:{% if r.percent>=80 %}var(--green){% elif r.percent>=60 %}var(--amber){% else %}var(--red){% endif %}">{{ r.percent }}%</span></td>
+        <td style="color:var(--ink4)">{{ r.taken_at.strftime('%d %b') }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  {% else %}
+  <p style="color:var(--ink3);font-size:.8rem;text-align:center;padding:24px 0">No submissions yet.</p>
+  {% endif %}
+</div>
+{% endblock %}
