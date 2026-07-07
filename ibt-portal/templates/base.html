@@ -16,7 +16,7 @@
       <div class="sidebar-meta">Eastern Public School<br/>IBT Preparation Portal</div>
     </div>
     <div class="nav-section">Main</div>
-    {% if session.role == 'admin' %}
+ {% if session.role == 'admin' or session.role == 'Resource_Manager' %}
       <a href="/admin" class="nav-link {% if request.path=='/admin' %}active{% endif %}"><span class="nav-icon">🏠</span>Dashboard</a>
       <div class="nav-section">Manage</div>
       <a href="/admin/students" class="nav-link {% if 'students' in request.path %}active{% endif %}"><span class="nav-icon">👨‍🎓</span>Students</a>
