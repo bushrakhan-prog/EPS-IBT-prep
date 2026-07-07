@@ -3,7 +3,8 @@ from flask_sqlalchemy import SQLAlchemy
 from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime
 import json, os
-
+from psycopg2cffi import compat
+compat.register()
 app = Flask(__name__)
 app.secret_key = 'eps-ibt-portal-secret-key'
 app.jinja_env.filters['from_json'] = json.loads
