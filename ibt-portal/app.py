@@ -5,13 +5,14 @@ from datetime import datetime
 import json, os
 from psycopg2cffi import compat
 compat.register()
+ 
 app = Flask(__name__)
 app.secret_key = 'eps-ibt-portal-secret-key'
 app.jinja_env.filters['from_json'] = json.loads
 app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'sqlite:///database.db').replace('postgres://', 'postgresql://')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
-
+ 
 SUBJECTS  = ['English', 'Mathematics', 'Science', 'Reasoning']
 GRADES    = ['Grade 3', 'Grade 4', 'Grade 5']
 SECTIONS_BY_SUBJECT = {
@@ -20,20 +21,20 @@ SECTIONS_BY_SUBJECT = {
     'Science':     ['Life Science', 'Physical Science', 'Earth Science', 'Scientific Inquiry'],
     'Reasoning':   ['Verbal Reasoning', 'Non-Verbal Reasoning', 'Logical Thinking', 'Pattern Recognition'],
 }
-
+ 
 # ── MODELS ───────────────────────────────────────────────────────────────────
-
+ 
 class User(db.Model):
     id       = db.Column(db.Integer, primary_key=True)
     name     = db.Column(db.String(100), nullable=False)
     username = db.Column(db.String(50), unique=True, nullable=False)
     password = db.Column(db.String(200), nullable=False)
-    role     = db.Column(db.String(10), nullable=False)
+    role     = db.Column(db.String(20), nullable=False)
     grade    = db.Column(db.String(20), nullable=True)
     section  = db.Column(db.String(10), nullable=True)
     created  = db.Column(db.DateTime, default=datetime.utcnow)
     results  = db.relationship('TestResult', backref='student', lazy=True, cascade='all,delete-orphan')
-
+ 
 class MockTest(db.Model):
     id         = db.Column(db.Integer, primary_key=True)
     name       = db.Column(db.String(200), nullable=False)
@@ -45,7 +46,7 @@ class MockTest(db.Model):
     questions  = db.Column(db.Text, default='[]')
     created    = db.Column(db.DateTime, default=datetime.utcnow)
     results    = db.relationship('TestResult', backref='test', lazy=True, cascade='all,delete-orphan')
-
+ 
 class TestResult(db.Model):
     id             = db.Column(db.Integer, primary_key=True)
     student_id     = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
@@ -57,9 +58,9 @@ class TestResult(db.Model):
     section_scores = db.Column(db.Text, default='{}')
     time_taken     = db.Column(db.Integer, default=0)
     taken_at       = db.Column(db.DateTime, default=datetime.utcnow)
-
+ 
 # ── HELPERS ──────────────────────────────────────────────────────────────────
-
+ 
 def login_required(role=None):
     from functools import wraps
     def decorator(f):
@@ -73,22 +74,19 @@ def login_required(role=None):
             return f(*args, **kwargs)
         return decorated
     return decorator
-
+ 
 def safe_avg(lst):
     lst = [x for x in lst if x is not None]
     return round(sum(lst)/len(lst), 1) if lst else 0
-
+ 
 def build_analytics():
-    """Build full analytics data structure used by all analytics views."""
     students    = User.query.filter_by(role='student').all()
     all_results = TestResult.query.all()
-
-    # ── Overall stats ─────────────────────────────────────────────────────────
+ 
     overall_avg = safe_avg([r.percent for r in all_results])
     above80     = sum(1 for r in all_results if r.percent >= 80)
     below60     = sum(1 for r in all_results if r.percent < 60)
-
-    # ── Grade-wise ────────────────────────────────────────────────────────────
+ 
     grade_data = {}
     for g in GRADES:
         rs = [r for r in all_results if r.student.grade == g]
@@ -97,8 +95,7 @@ def build_analytics():
             'count': len(rs),
             'students': len([s for s in students if s.grade == g]),
         }
-
-    # ── Subject-wise ──────────────────────────────────────────────────────────
+ 
     subject_data = {}
     for sub in SUBJECTS:
         rs = [r for r in all_results if r.test.subject == sub]
@@ -106,16 +103,14 @@ def build_analytics():
             'avg': safe_avg([r.percent for r in rs]),
             'count': len(rs),
         }
-
-    # ── Grade + Subject cross-tab ─────────────────────────────────────────────
+ 
     grade_subject = {}
     for g in GRADES:
         grade_subject[g] = {}
         for sub in SUBJECTS:
             rs = [r for r in all_results if r.student.grade == g and r.test.subject == sub]
             grade_subject[g][sub] = safe_avg([r.percent for r in rs])
-
-    # ── Section-wise (across all subjects) ───────────────────────────────────
+ 
     section_data = {}
     for r in all_results:
         try:
@@ -127,8 +122,7 @@ def build_analytics():
         except Exception:
             pass
     section_avgs = {sec: safe_avg(vals) for sec, vals in section_data.items()}
-
-    # ── Per-student summary ───────────────────────────────────────────────────
+ 
     student_rows = []
     for s in students:
         rs = [r for r in all_results if r.student_id == s.id]
@@ -140,7 +134,7 @@ def build_analytics():
             'sub_avgs': sub_avgs,
         })
     student_rows.sort(key=lambda x: -x['overall_avg'])
-
+ 
     return dict(
         overall_avg=overall_avg, above80=above80, below60=below60,
         total_results=len(all_results), total_students=len(students),
@@ -148,9 +142,9 @@ def build_analytics():
         grade_subject=grade_subject, section_avgs=section_avgs,
         student_rows=student_rows, subjects=SUBJECTS, grades=GRADES,
     )
-
+ 
 def seed_db():
-    if User.query.filter_by(username='Resource_Manager').first():
+    if User.query.first():
         return
     db.session.add(User(name='Resource_Manager', username='Organizer',
         password=generate_password_hash('bk*123'), role='Resource_Manager'))
@@ -182,9 +176,9 @@ def seed_db():
     db.session.add(MockTest(name='IBT Reasoning Set 1', subject='Reasoning', grade='Grade 4', difficulty='Medium', duration=30, status='draft', questions='[]'))
     db.session.commit()
     print("✅ Database seeded.")
-
+ 
 # ── AUTH ──────────────────────────────────────────────────────────────────────
-
+ 
 @app.route('/', methods=['GET','POST'])
 def login():
     if request.method == 'POST':
@@ -198,14 +192,14 @@ def login():
             return redirect(url_for(f"{user.role}_dashboard"))
         flash('Invalid username or password.', 'error')
     return render_template('login.html')
-
+ 
 @app.route('/logout')
 def logout():
     session.clear()
     return redirect(url_for('login'))
-
+ 
 # ── ADMIN ─────────────────────────────────────────────────────────────────────
-
+ 
 @app.route('/admin')
 @login_required('admin')
 def admin_dashboard():
@@ -217,7 +211,7 @@ def admin_dashboard():
     return render_template('admin/dashboard.html',
         students=students, tests=tests, results=results,
         avg_score=avg_score, recent=recent, subjects=SUBJECTS, grades=GRADES)
-
+ 
 @app.route('/admin/students', methods=['GET','POST'])
 @login_required('admin')
 def admin_students():
@@ -250,7 +244,7 @@ def admin_students():
                 flash('Student updated.', 'success')
     students = User.query.filter_by(role='student').order_by(User.grade, User.name).all()
     return render_template('admin/students.html', students=students, grades=GRADES)
-
+ 
 @app.route('/admin/teachers', methods=['GET','POST'])
 @login_required('admin')
 def admin_teachers():
@@ -270,7 +264,7 @@ def admin_teachers():
             flash('Teacher removed.', 'success')
     teachers = User.query.filter_by(role='teacher').all()
     return render_template('admin/teachers.html', teachers=teachers)
-
+ 
 @app.route('/admin/tests', methods=['GET','POST'])
 @login_required('admin')
 def admin_tests():
@@ -294,7 +288,7 @@ def admin_tests():
                 db.session.commit()
     tests = MockTest.query.order_by(MockTest.created.desc()).all()
     return render_template('admin/tests.html', tests=tests, subjects=SUBJECTS, grades=GRADES)
-
+ 
 @app.route('/admin/tests/<int:test_id>/questions', methods=['GET','POST'])
 @login_required('admin')
 def admin_questions(test_id):
@@ -316,7 +310,7 @@ def admin_questions(test_id):
         flash('Question added.', 'success')
     questions = json.loads(test.questions or '[]')
     return render_template('admin/questions.html', test=test, questions=questions, subject_sections=subject_sections)
-
+ 
 @app.route('/admin/questions/delete/<int:test_id>/<int:q_id>', methods=['POST'])
 @login_required('admin')
 def delete_question(test_id, q_id):
@@ -327,15 +321,15 @@ def delete_question(test_id, q_id):
         db.session.commit()
         flash('Question deleted.', 'success')
     return redirect(url_for('admin_questions', test_id=test_id))
-
+ 
 @app.route('/admin/analytics')
 @login_required('admin')
 def admin_analytics():
     data = build_analytics()
     return render_template('admin/analytics.html', **data)
-
+ 
 # ── TEACHER ───────────────────────────────────────────────────────────────────
-
+ 
 @app.route('/teacher')
 @login_required('teacher')
 def teacher_dashboard():
@@ -346,7 +340,7 @@ def teacher_dashboard():
     recent    = sorted(results, key=lambda r: r.taken_at, reverse=True)[:6]
     return render_template('teacher/dashboard.html',
         students=students, results=results, tests=tests, avg_score=avg_score, recent=recent)
-
+ 
 @app.route('/teacher/students')
 @login_required('teacher')
 def teacher_students():
@@ -359,15 +353,15 @@ def teacher_students():
             'avg': safe_avg([r.percent for r in rs]),
         })
     return render_template('teacher/students.html', student_data=student_data)
-
+ 
 @app.route('/teacher/analytics')
 @login_required('teacher')
 def teacher_analytics():
     data = build_analytics()
     return render_template('teacher/analytics.html', **data)
-
+ 
 # ── STUDENT ───────────────────────────────────────────────────────────────────
-
+ 
 @app.route('/student')
 @login_required('student')
 def student_dashboard():
@@ -377,7 +371,7 @@ def student_dashboard():
     avg_sc  = safe_avg([r.percent for r in results])
     return render_template('student/dashboard.html',
         student=student, results=results, tests=tests, avg_sc=avg_sc, subjects=SUBJECTS)
-
+ 
 @app.route('/student/test/<int:test_id>')
 @login_required('student')
 def student_test(test_id):
@@ -385,7 +379,7 @@ def student_test(test_id):
     if not test: return redirect(url_for('student_dashboard'))
     questions = json.loads(test.questions or '[]')
     return render_template('student/test.html', test=test, questions=questions)
-
+ 
 @app.route('/student/submit/<int:test_id>', methods=['POST'])
 @login_required('student')
 def submit_test(test_id):
@@ -413,16 +407,16 @@ def submit_test(test_id):
         time_taken=time_taken))
     db.session.commit()
     return jsonify({'score':score,'total':total,'percent':percent,'section_scores':section_scores})
-
+ 
 @app.route('/student/scores')
 @login_required('student')
 def student_scores():
     student = db.session.get(User, session['user_id'])
     results = sorted(student.results, key=lambda r: r.taken_at, reverse=True)
     return render_template('student/scores.html', student=student, results=results)
-
+ 
 # ── API ───────────────────────────────────────────────────────────────────────
-
+ 
 @app.route('/api/analytics')
 @login_required('admin')
 def api_analytics():
@@ -432,15 +426,13 @@ def api_analytics():
         g = r.student.grade or 'Unknown'
         by_grade.setdefault(g, []).append(r.percent)
     return jsonify({g: round(sum(v)/len(v),1) for g,v in by_grade.items()})
-
+ 
 # ── MAIN ──────────────────────────────────────────────────────────────────────
-
+ 
 with app.app_context():
     db.create_all()
-   def seed_db():
-    if User.query.first():
-        return
-
+    seed_db()
+ 
 if __name__ == '__main__':
     print("\n🎓 Eastern Public School — IBT Portal")
     print("   Running at → http://localhost:5000")
