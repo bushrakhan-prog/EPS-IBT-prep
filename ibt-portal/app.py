@@ -189,7 +189,11 @@ def login():
             session['user_id'] = user.id
             session['role']    = user.role
             session['name']    = user.name
-            return redirect(url_for(f"{user.role}_dashboard"))
+           role = user.role
+if role == 'Resource_Manager':
+    return redirect(url_for('admin_dashboard'))
+else:
+    return redirect(url_for(f"{role}_dashboard"))
         flash('Invalid username or password.', 'error')
     return render_template('login.html')
  
