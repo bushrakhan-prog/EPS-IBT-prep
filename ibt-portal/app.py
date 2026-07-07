@@ -189,11 +189,11 @@ def login():
             session['user_id'] = user.id
             session['role']    = user.role
             session['name']    = user.name
-           role = user.role
-if role == 'Resource_Manager':
-    return redirect(url_for('admin_dashboard'))
-else:
-    return redirect(url_for(f"{role}_dashboard"))
+            role = user.role
+            if role == 'Resource_Manager':
+                return redirect(url_for('admin_dashboard'))
+            else:
+                return redirect(url_for(f"{role}_dashboard"))
         flash('Invalid username or password.', 'error')
     return render_template('login.html')
  
@@ -205,7 +205,7 @@ def logout():
 # ── ADMIN ─────────────────────────────────────────────────────────────────────
  
 @app.route('/admin')
-@login_required('admin')
+@login_required('Resource_Manager')
 def admin_dashboard():
     students  = User.query.filter_by(role='student').all()
     tests     = MockTest.query.all()
@@ -217,7 +217,7 @@ def admin_dashboard():
         avg_score=avg_score, recent=recent, subjects=SUBJECTS, grades=GRADES)
  
 @app.route('/admin/students', methods=['GET','POST'])
-@login_required('admin')
+@login_required('Resource_Manager')
 def admin_students():
     if request.method == 'POST':
         action = request.form.get('action')
@@ -250,7 +250,7 @@ def admin_students():
     return render_template('admin/students.html', students=students, grades=GRADES)
  
 @app.route('/admin/teachers', methods=['GET','POST'])
-@login_required('admin')
+@login_required('Resource_Manager')
 def admin_teachers():
     if request.method == 'POST':
         action = request.form.get('action')
@@ -270,7 +270,7 @@ def admin_teachers():
     return render_template('admin/teachers.html', teachers=teachers)
  
 @app.route('/admin/tests', methods=['GET','POST'])
-@login_required('admin')
+@login_required('Resource_Manager')
 def admin_tests():
     if request.method == 'POST':
         action = request.form.get('action')
@@ -294,7 +294,7 @@ def admin_tests():
     return render_template('admin/tests.html', tests=tests, subjects=SUBJECTS, grades=GRADES)
  
 @app.route('/admin/tests/<int:test_id>/questions', methods=['GET','POST'])
-@login_required('admin')
+@login_required('Resource_Manager')
 def admin_questions(test_id):
     test = db.session.get(MockTest, test_id)
     if not test: flash('Test not found.','error'); return redirect(url_for('admin_tests'))
@@ -316,7 +316,7 @@ def admin_questions(test_id):
     return render_template('admin/questions.html', test=test, questions=questions, subject_sections=subject_sections)
  
 @app.route('/admin/questions/delete/<int:test_id>/<int:q_id>', methods=['POST'])
-@login_required('admin')
+@login_required('Resource_Manager')
 def delete_question(test_id, q_id):
     test = db.session.get(MockTest, test_id)
     if test:
@@ -327,7 +327,7 @@ def delete_question(test_id, q_id):
     return redirect(url_for('admin_questions', test_id=test_id))
  
 @app.route('/admin/analytics')
-@login_required('admin')
+@login_required('Resource_Manager')
 def admin_analytics():
     data = build_analytics()
     return render_template('admin/analytics.html', **data)
@@ -422,7 +422,7 @@ def student_scores():
 # ── API ───────────────────────────────────────────────────────────────────────
  
 @app.route('/api/analytics')
-@login_required('admin')
+@login_required('Resource_Manager')
 def api_analytics():
     results  = TestResult.query.all()
     by_grade = {}
@@ -440,7 +440,7 @@ with app.app_context():
 if __name__ == '__main__':
     print("\n🎓 Eastern Public School — IBT Portal")
     print("   Running at → http://localhost:5000")
-    print("   Admin    : admin / admin123")
+    print("   Admin    : Organizer / bk*123")
     print("   Teacher  : teacher1 / teacher123")
     print("   Student  : aarav / student123\n")
     app.run(debug=True, host='0.0.0.0', port=5000)
