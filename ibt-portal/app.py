@@ -435,10 +435,11 @@ def api_analytics():
 
 # ── MAIN ──────────────────────────────────────────────────────────────────────
 
+with app.app_context():
+    db.create_all()
+    seed_db()
+
 if __name__ == '__main__':
-    with app.app_context():
-        db.create_all()
-        seed_db()
     print("\n🎓 Eastern Public School — IBT Portal")
     print("   Running at → http://localhost:5000")
     print("   Admin    : admin / admin123")
