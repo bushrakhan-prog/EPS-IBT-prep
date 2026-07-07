@@ -437,7 +437,9 @@ def api_analytics():
 
 with app.app_context():
     db.create_all()
-    seed_db()
+   def seed_db():
+    if User.query.first():
+        return
 
 if __name__ == '__main__':
     print("\n🎓 Eastern Public School — IBT Portal")
