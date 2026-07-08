@@ -63,7 +63,12 @@
           <select class="form-input" name="subject">{% for s in subjects %}<option>{{ s }}</option>{% endfor %}</select>
         </div>
         <div class="form-group"><label class="form-label">Grade</label>
-          <select class="form-input" name="grade">{% for g in grades %}<option>{{ g }}</option>{% endfor %}</select>
+        <select name="grade" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;font-size:.85rem">
+  <option value="All Grades">All Grades (3, 4 &amp; 5)</option>
+  <option value="Grade 3">Grade 3</option>
+  <option value="Grade 4">Grade 4</option>
+  <option value="Grade 5">Grade 5</option>
+</select>
         </div>
       </div>
       <div class="form-row">
