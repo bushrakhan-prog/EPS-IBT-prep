@@ -404,23 +404,43 @@ def admin_tests():
     if request.method == 'POST':
         action = request.form.get('action')
         if action == 'add':
-            db.session.add(MockTest(
-                name=request.form['name'], subject=request.form['subject'],
-                grade=request.form['grade'], difficulty=request.form['difficulty'],
-                duration=int(request.form['duration']), status=request.form['status']))
-            db.session.commit()
-            flash('Test created.', 'success')
-        elif action == 'delete':
-            t = db.session.get(MockTest, int(request.form['test_id']))
-            if t: db.session.delete(t); db.session.commit()
-            flash('Test deleted.', 'success')
-        elif action == 'toggle':
-            t = db.session.get(MockTest, int(request.form['test_id']))
-            if t:
-                t.status = 'active' if t.status == 'draft' else 'draft'
+            grade = request.form['grade']
+            if grade == 'All Grades':
+                # Create one test per grade
+                for g in GRADES:
+                    db.session.add(MockTest(
+                        name=request.form['name'], subject=request.form['subject'],
+                        grade=g, difficulty=request.form['difficulty'],
+                        duration=int(request.form['duration']), status=request.form['status']))
                 db.session.commit()
+                flash(f'Test created for all grades (Grade 3, 4 & 5).', 'success')
+            else:
+                db.session.add(MockTest(
+                    name=request.form['name'], subject=request.form['subject'],
+                    grade=grade, difficulty=request.form['difficulty'],
+                    duration=int(request.form['duration']), status=request.form['status']))
+                db.session.commit()
+                flash('Test created.', 'success')
+        elif action == 'delete':
+            test_id = request.form.get('test_id')
+            if test_id:
+                t = db.session.get(MockTest, int(test_id))
+                if t:
+                    db.session.delete(t)
+                    db.session.commit()
+                    flash('Test deleted.', 'success')
+                else:
+                    flash('Test not found.', 'error')
+        elif action == 'toggle':
+            test_id = request.form.get('test_id')
+            if test_id:
+                t = db.session.get(MockTest, int(test_id))
+                if t:
+                    t.status = 'active' if t.status == 'draft' else 'draft'
+                    db.session.commit()
     tests = MockTest.query.order_by(MockTest.created.desc()).all()
-    return render_template('admin/tests.html', tests=tests, subjects=SUBJECTS, grades=GRADES)
+    all_grades = ['All Grades'] + GRADES
+    return render_template('admin/tests.html', tests=tests, subjects=SUBJECTS, grades=GRADES, all_grades=all_grades)
 
 @app.route('/admin/tests/<int:test_id>/questions', methods=['GET','POST'])
 @login_required('Resource_Manager')
@@ -500,7 +520,10 @@ def teacher_analytics():
 def student_dashboard():
     student = db.session.get(User, session['user_id'])
     results = sorted(student.results, key=lambda r: r.taken_at, reverse=True)
-    tests   = MockTest.query.filter_by(status='active', grade=student.grade).all()
+    tests   = MockTest.query.filter(
+        MockTest.status=='active',
+        db.or_(MockTest.grade==student.grade, MockTest.grade=='All Grades')
+    ).all()
     avg_sc  = safe_avg([r.percent for r in results])
     return render_template('student/dashboard.html',
         student=student, results=results, tests=tests, avg_sc=avg_sc, subjects=SUBJECTS)
