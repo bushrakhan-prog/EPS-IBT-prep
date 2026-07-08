@@ -1,18 +1,18 @@
-from flask import Flask, render_template, request, redirect, url_for, session, jsonify, flash
+from flask import Flask, render_template, request, redirect, url_for, session, jsonify, flash, Response
 from flask_sqlalchemy import SQLAlchemy
 from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime
-import json, os
+import json, os, csv, io, re
 from psycopg2cffi import compat
 compat.register()
- 
+
 app = Flask(__name__)
 app.secret_key = 'eps-ibt-portal-secret-key'
 app.jinja_env.filters['from_json'] = json.loads
 app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'sqlite:///database.db').replace('postgres://', 'postgresql://')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
- 
+
 SUBJECTS  = ['English', 'Mathematics', 'Science', 'Reasoning']
 GRADES    = ['Grade 3', 'Grade 4', 'Grade 5']
 SECTIONS_BY_SUBJECT = {
@@ -21,9 +21,9 @@ SECTIONS_BY_SUBJECT = {
     'Science':     ['Life Science', 'Physical Science', 'Earth Science', 'Scientific Inquiry'],
     'Reasoning':   ['Verbal Reasoning', 'Non-Verbal Reasoning', 'Logical Thinking', 'Pattern Recognition'],
 }
- 
+
 # ── MODELS ───────────────────────────────────────────────────────────────────
- 
+
 class User(db.Model):
     id       = db.Column(db.Integer, primary_key=True)
     name     = db.Column(db.String(100), nullable=False)
@@ -34,7 +34,7 @@ class User(db.Model):
     section  = db.Column(db.String(10), nullable=True)
     created  = db.Column(db.DateTime, default=datetime.utcnow)
     results  = db.relationship('TestResult', backref='student', lazy=True, cascade='all,delete-orphan')
- 
+
 class MockTest(db.Model):
     id         = db.Column(db.Integer, primary_key=True)
     name       = db.Column(db.String(200), nullable=False)
@@ -46,7 +46,7 @@ class MockTest(db.Model):
     questions  = db.Column(db.Text, default='[]')
     created    = db.Column(db.DateTime, default=datetime.utcnow)
     results    = db.relationship('TestResult', backref='test', lazy=True, cascade='all,delete-orphan')
- 
+
 class TestResult(db.Model):
     id             = db.Column(db.Integer, primary_key=True)
     student_id     = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
@@ -58,9 +58,9 @@ class TestResult(db.Model):
     section_scores = db.Column(db.Text, default='{}')
     time_taken     = db.Column(db.Integer, default=0)
     taken_at       = db.Column(db.DateTime, default=datetime.utcnow)
- 
+
 # ── HELPERS ──────────────────────────────────────────────────────────────────
- 
+
 def login_required(role=None):
     from functools import wraps
     def decorator(f):
@@ -74,19 +74,37 @@ def login_required(role=None):
             return f(*args, **kwargs)
         return decorated
     return decorator
- 
+
 def safe_avg(lst):
     lst = [x for x in lst if x is not None]
     return round(sum(lst)/len(lst), 1) if lst else 0
- 
+
+def generate_username(name, grade):
+    """Generate username from first name + grade number e.g. ahmed_g3"""
+    first = re.sub(r'[^a-z0-9]', '', name.split()[0].lower())
+    grade_num = re.sub(r'[^0-9]', '', grade)
+    base = f"{first}_g{grade_num}"
+    username = base
+    counter = 1
+    while User.query.filter_by(username=username).first():
+        username = f"{base}{counter}"
+        counter += 1
+    return username
+
+def generate_password(name, grade):
+    """Generate password: EPS@ + first3letters of name (capitalized) + grade number"""
+    first3 = name[:3].capitalize()
+    grade_num = re.sub(r'[^0-9]', '', grade)
+    return f"EPS@{first3}{grade_num}"
+
 def build_analytics():
     students    = User.query.filter_by(role='student').all()
     all_results = TestResult.query.all()
- 
+
     overall_avg = safe_avg([r.percent for r in all_results])
     above80     = sum(1 for r in all_results if r.percent >= 80)
     below60     = sum(1 for r in all_results if r.percent < 60)
- 
+
     grade_data = {}
     for g in GRADES:
         rs = [r for r in all_results if r.student.grade == g]
@@ -95,7 +113,7 @@ def build_analytics():
             'count': len(rs),
             'students': len([s for s in students if s.grade == g]),
         }
- 
+
     subject_data = {}
     for sub in SUBJECTS:
         rs = [r for r in all_results if r.test.subject == sub]
@@ -103,14 +121,14 @@ def build_analytics():
             'avg': safe_avg([r.percent for r in rs]),
             'count': len(rs),
         }
- 
+
     grade_subject = {}
     for g in GRADES:
         grade_subject[g] = {}
         for sub in SUBJECTS:
             rs = [r for r in all_results if r.student.grade == g and r.test.subject == sub]
             grade_subject[g][sub] = safe_avg([r.percent for r in rs])
- 
+
     section_data = {}
     for r in all_results:
         try:
@@ -122,7 +140,7 @@ def build_analytics():
         except Exception:
             pass
     section_avgs = {sec: safe_avg(vals) for sec, vals in section_data.items()}
- 
+
     student_rows = []
     for s in students:
         rs = [r for r in all_results if r.student_id == s.id]
@@ -134,7 +152,7 @@ def build_analytics():
             'sub_avgs': sub_avgs,
         })
     student_rows.sort(key=lambda x: -x['overall_avg'])
- 
+
     return dict(
         overall_avg=overall_avg, above80=above80, below60=below60,
         total_results=len(all_results), total_students=len(students),
@@ -142,7 +160,7 @@ def build_analytics():
         grade_subject=grade_subject, section_avgs=section_avgs,
         student_rows=student_rows, subjects=SUBJECTS, grades=GRADES,
     )
- 
+
 def seed_db():
     if User.query.first():
         return
@@ -176,9 +194,9 @@ def seed_db():
     db.session.add(MockTest(name='IBT Reasoning Set 1', subject='Reasoning', grade='Grade 4', difficulty='Medium', duration=30, status='draft', questions='[]'))
     db.session.commit()
     print("✅ Database seeded.")
- 
+
 # ── AUTH ──────────────────────────────────────────────────────────────────────
- 
+
 @app.route('/', methods=['GET','POST'])
 def login():
     if request.method == 'POST':
@@ -196,14 +214,14 @@ def login():
                 return redirect(url_for(f"{role}_dashboard"))
         flash('Invalid username or password.', 'error')
     return render_template('login.html')
- 
+
 @app.route('/logout')
 def logout():
     session.clear()
     return redirect(url_for('login'))
- 
+
 # ── ADMIN ─────────────────────────────────────────────────────────────────────
- 
+
 @app.route('/admin')
 @login_required('Resource_Manager')
 def admin_dashboard():
@@ -215,7 +233,7 @@ def admin_dashboard():
     return render_template('admin/dashboard.html',
         students=students, tests=tests, results=results,
         avg_score=avg_score, recent=recent, subjects=SUBJECTS, grades=GRADES)
- 
+
 @app.route('/admin/students', methods=['GET','POST'])
 @login_required('Resource_Manager')
 def admin_students():
@@ -248,7 +266,102 @@ def admin_students():
                 flash('Student updated.', 'success')
     students = User.query.filter_by(role='student').order_by(User.grade, User.name).all()
     return render_template('admin/students.html', students=students, grades=GRADES)
- 
+
+
+@app.route('/admin/students/upload', methods=['GET','POST'])
+@login_required('Resource_Manager')
+def upload_students():
+    preview = []
+    if request.method == 'POST':
+        action = request.form.get('action')
+
+        # ── Step 1: parse CSV and show preview ───────────────────────────────
+        if action == 'preview':
+            file = request.files.get('csv_file')
+            if not file or not file.filename.endswith('.csv'):
+                flash('Please upload a valid .csv file.', 'error')
+                return redirect(url_for('upload_students'))
+            stream = io.StringIO(file.stream.read().decode('utf-8-sig'))
+            reader = csv.DictReader(stream)
+            for row in reader:
+                name    = row.get('name','').strip()
+                grade   = row.get('grade','').strip()
+                section = row.get('section','A').strip()
+                if not name or not grade:
+                    continue
+                # Use existing username/password from CSV if provided
+                username = row.get('username','').strip() or generate_username(name, grade)
+                password = row.get('password','').strip() or generate_password(name, grade)
+                # Normalise grade: accept "3", "Grade 3", "grade 3"
+                if grade.strip().isdigit():
+                    grade = f"Grade {grade.strip()}"
+                preview.append({
+                    'name': name, 'grade': grade, 'section': section,
+                    'username': username, 'password': password,
+                })
+            return render_template('admin/upload_students.html',
+                                   preview=preview, grades=GRADES)
+
+        # ── Step 2: confirm and save to DB ───────────────────────────────────
+        elif action == 'confirm':
+            names     = request.form.getlist('name')
+            usernames = request.form.getlist('username')
+            passwords = request.form.getlist('password')
+            grades    = request.form.getlist('grade')
+            sections  = request.form.getlist('section')
+            added = 0
+            for i in range(len(names)):
+                if User.query.filter_by(username=usernames[i]).first():
+                    continue
+                db.session.add(User(
+                    name=names[i], username=usernames[i],
+                    password=generate_password_hash(passwords[i]),
+                    role='student', grade=grades[i], section=sections[i]
+                ))
+                added += 1
+            db.session.commit()
+            flash(f'✅ {added} students added successfully!', 'success')
+            return redirect(url_for('admin_students'))
+
+    return render_template('admin/upload_students.html', preview=preview, grades=GRADES)
+
+
+@app.route('/admin/students/download-template')
+@login_required('Resource_Manager')
+def download_csv_template():
+    """Download a sample CSV template for bulk upload."""
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(['name', 'grade', 'section'])
+    writer.writerow(['Ahmed Khan', 'Grade 3', 'A'])
+    writer.writerow(['Sara Ali', 'Grade 4', 'B'])
+    writer.writerow(['Fatima Noor', 'Grade 5', 'A'])
+    output.seek(0)
+    return Response(
+        output.getvalue(),
+        mimetype='text/csv',
+        headers={'Content-Disposition': 'attachment; filename=students_template.csv'}
+    )
+
+
+@app.route('/admin/students/download-credentials')
+@login_required('Resource_Manager')
+def download_credentials():
+    """Download all student usernames and passwords as CSV."""
+    students = User.query.filter_by(role='student').order_by(User.grade, User.name).all()
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(['Name', 'Grade', 'Section', 'Username', 'Note'])
+    for s in students:
+        writer.writerow([s.name, s.grade, s.section, s.username, 'Password was set at creation'])
+    output.seek(0)
+    return Response(
+        output.getvalue(),
+        mimetype='text/csv',
+        headers={'Content-Disposition': 'attachment; filename=student_credentials.csv'}
+    )
+
+
 @app.route('/admin/teachers', methods=['GET','POST'])
 @login_required('Resource_Manager')
 def admin_teachers():
@@ -268,7 +381,7 @@ def admin_teachers():
             flash('Teacher removed.', 'success')
     teachers = User.query.filter_by(role='teacher').all()
     return render_template('admin/teachers.html', teachers=teachers)
- 
+
 @app.route('/admin/tests', methods=['GET','POST'])
 @login_required('Resource_Manager')
 def admin_tests():
@@ -292,7 +405,7 @@ def admin_tests():
                 db.session.commit()
     tests = MockTest.query.order_by(MockTest.created.desc()).all()
     return render_template('admin/tests.html', tests=tests, subjects=SUBJECTS, grades=GRADES)
- 
+
 @app.route('/admin/tests/<int:test_id>/questions', methods=['GET','POST'])
 @login_required('Resource_Manager')
 def admin_questions(test_id):
@@ -314,7 +427,7 @@ def admin_questions(test_id):
         flash('Question added.', 'success')
     questions = json.loads(test.questions or '[]')
     return render_template('admin/questions.html', test=test, questions=questions, subject_sections=subject_sections)
- 
+
 @app.route('/admin/questions/delete/<int:test_id>/<int:q_id>', methods=['POST'])
 @login_required('Resource_Manager')
 def delete_question(test_id, q_id):
@@ -325,15 +438,15 @@ def delete_question(test_id, q_id):
         db.session.commit()
         flash('Question deleted.', 'success')
     return redirect(url_for('admin_questions', test_id=test_id))
- 
+
 @app.route('/admin/analytics')
 @login_required('Resource_Manager')
 def admin_analytics():
     data = build_analytics()
     return render_template('admin/analytics.html', **data)
- 
+
 # ── TEACHER ───────────────────────────────────────────────────────────────────
- 
+
 @app.route('/teacher')
 @login_required('teacher')
 def teacher_dashboard():
@@ -344,7 +457,7 @@ def teacher_dashboard():
     recent    = sorted(results, key=lambda r: r.taken_at, reverse=True)[:6]
     return render_template('teacher/dashboard.html',
         students=students, results=results, tests=tests, avg_score=avg_score, recent=recent)
- 
+
 @app.route('/teacher/students')
 @login_required('teacher')
 def teacher_students():
@@ -357,15 +470,15 @@ def teacher_students():
             'avg': safe_avg([r.percent for r in rs]),
         })
     return render_template('teacher/students.html', student_data=student_data)
- 
+
 @app.route('/teacher/analytics')
 @login_required('teacher')
 def teacher_analytics():
     data = build_analytics()
     return render_template('teacher/analytics.html', **data)
- 
+
 # ── STUDENT ───────────────────────────────────────────────────────────────────
- 
+
 @app.route('/student')
 @login_required('student')
 def student_dashboard():
@@ -375,7 +488,7 @@ def student_dashboard():
     avg_sc  = safe_avg([r.percent for r in results])
     return render_template('student/dashboard.html',
         student=student, results=results, tests=tests, avg_sc=avg_sc, subjects=SUBJECTS)
- 
+
 @app.route('/student/test/<int:test_id>')
 @login_required('student')
 def student_test(test_id):
@@ -383,7 +496,7 @@ def student_test(test_id):
     if not test: return redirect(url_for('student_dashboard'))
     questions = json.loads(test.questions or '[]')
     return render_template('student/test.html', test=test, questions=questions)
- 
+
 @app.route('/student/submit/<int:test_id>', methods=['POST'])
 @login_required('student')
 def submit_test(test_id):
@@ -411,16 +524,16 @@ def submit_test(test_id):
         time_taken=time_taken))
     db.session.commit()
     return jsonify({'score':score,'total':total,'percent':percent,'section_scores':section_scores})
- 
+
 @app.route('/student/scores')
 @login_required('student')
 def student_scores():
     student = db.session.get(User, session['user_id'])
     results = sorted(student.results, key=lambda r: r.taken_at, reverse=True)
     return render_template('student/scores.html', student=student, results=results)
- 
+
 # ── API ───────────────────────────────────────────────────────────────────────
- 
+
 @app.route('/api/analytics')
 @login_required('Resource_Manager')
 def api_analytics():
@@ -430,13 +543,13 @@ def api_analytics():
         g = r.student.grade or 'Unknown'
         by_grade.setdefault(g, []).append(r.percent)
     return jsonify({g: round(sum(v)/len(v),1) for g,v in by_grade.items()})
- 
+
 # ── MAIN ──────────────────────────────────────────────────────────────────────
- 
+
 with app.app_context():
     db.create_all()
     seed_db()
- 
+
 if __name__ == '__main__':
     print("\n🎓 Eastern Public School — IBT Portal")
     print("   Running at → http://localhost:5000")
