@@ -310,17 +310,33 @@ def upload_students():
             grades    = request.form.getlist('grade')
             sections  = request.form.getlist('section')
             added = 0
-            for i in range(len(names)):
-                if User.query.filter_by(username=usernames[i]).first():
-                    continue
-                db.session.add(User(
-                    name=names[i], username=usernames[i],
-                    password=generate_password_hash(passwords[i]),
-                    role='student', grade=grades[i], section=sections[i]
-                ))
-                added += 1
-            db.session.commit()
-            flash(f'✅ {added} students added successfully!', 'success')
+            skipped = 0
+            try:
+                BATCH = 20  # commit every 20 to avoid memory kill
+                for i in range(len(names)):
+                    if not names[i] or not usernames[i] or not passwords[i]:
+                        continue
+                    if User.query.filter_by(username=usernames[i]).first():
+                        skipped += 1
+                        continue
+                    # Use pbkdf2 with fewer rounds to save memory on free tier
+                    hashed = generate_password_hash(passwords[i], method='pbkdf2:sha256:10000')
+                    db.session.add(User(
+                        name=names[i], username=usernames[i],
+                        password=hashed,
+                        role='student', grade=grades[i], section=sections[i]
+                    ))
+                    added += 1
+                    if added % BATCH == 0:
+                        db.session.commit()  # commit in batches
+                db.session.commit()  # final commit
+                msg = f'✅ {added} students added successfully!'
+                if skipped:
+                    msg += f' ({skipped} skipped — username already exists)'
+                flash(msg, 'success')
+            except Exception as e:
+                db.session.rollback()
+                flash(f'❌ Error: {str(e)}', 'error')
             return redirect(url_for('admin_students'))
 
     return render_template('admin/upload_students.html', preview=preview, grades=GRADES)
