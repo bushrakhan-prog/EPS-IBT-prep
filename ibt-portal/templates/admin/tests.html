@@ -1,92 +1,197 @@
-{% extends "base.html" %}
-{% block title %}Mock Tests — EPS IBT Portal{% endblock %}
+{% extends 'base.html' %}
+{% block title %}Mock Tests{% endblock %}
 {% block page_title %}Mock Tests{% endblock %}
-{% block back_button %}<a href="/admin" class="back-btn">← Back</a>{% endblock %}
+{% block back_button %}<a href="/admin" class="btn btn-secondary btn-sm">← Back</a>{% endblock %}
+
 {% block content %}
-<div class="sec-header">
-  <div><div class="sec-title">Mock Test Papers</div><div class="sec-sub">{{ tests|length }} total</div></div>
-  <button class="btn btn-primary" onclick="document.getElementById('addModal').style.display='flex'">+ Create Test</button>
-</div>
-<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px">
-{% for t in tests %}
-{% set qs = t.questions|from_json %}
-<div class="card" style="border-top:3px solid {% if t.subject=='English' %}#3b82f6{% elif t.subject=='Mathematics' %}#10b981{% elif t.subject=='Science' %}#f59e0b{% else %}#8b5cf6{% endif %}">
-  <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px">
-    <div style="font-weight:600;font-size:.875rem;flex:1;padding-right:8px;line-height:1.3">{{ t.name }}</div>
-    <span class="badge {{ 'badge-green' if t.status=='active' else 'badge-amber' }}">{{ t.status }}</span>
-  </div>
-  <div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:12px">
-    <span class="badge badge-blue">{{ t.subject }}</span>
-    <span class="badge badge-purple">{{ t.grade }}</span>
-    <span class="badge {{ 'badge-green' if t.difficulty=='Easy' else ('badge-amber' if t.difficulty=='Medium' else 'badge-red') }}">{{ t.difficulty }}</span>
-  </div>
-  <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px">
-    <div style="background:var(--surface2);border-radius:7px;padding:7px 10px">
-      <div style="font-size:.62rem;color:var(--ink3)">📝 Questions</div>
-      <div style="font-weight:700;font-size:.875rem">{{ qs|length }}</div>
+
+<!-- Create Test Form -->
+<div class="card" style="margin-bottom:24px">
+  <h3 style="margin-top:0">+ Create New Test</h3>
+  <form method="POST" action="/admin/tests">
+    <input type="hidden" name="action" value="add"/>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px;margin-bottom:12px">
+      <div>
+        <label style="font-size:.8rem;font-weight:600;display:block;margin-bottom:4px">Test Title</label>
+        <input name="name" required placeholder="e.g. IBT English Set 3"
+               style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;font-size:.85rem"/>
+      </div>
+      <div>
+        <label style="font-size:.8rem;font-weight:600;display:block;margin-bottom:4px">Subject</label>
+        <select name="subject" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;font-size:.85rem">
+          {% for s in subjects %}<option>{{ s }}</option>{% endfor %}
+        </select>
+      </div>
+      <div>
+        <label style="font-size:.8rem;font-weight:600;display:block;margin-bottom:4px">Grade</label>
+        <select name="grade" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;font-size:.85rem">
+          <option value="All Grades">All Grades (3, 4 &amp; 5)</option>
+          <option value="Grade 3">Grade 3</option>
+          <option value="Grade 4">Grade 4</option>
+          <option value="Grade 5">Grade 5</option>
+        </select>
+      </div>
+      <div>
+        <label style="font-size:.8rem;font-weight:600;display:block;margin-bottom:4px">Difficulty</label>
+        <select name="difficulty" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;font-size:.85rem">
+          <option>Easy</option><option selected>Medium</option><option>Hard</option>
+        </select>
+      </div>
+      <div>
+        <label style="font-size:.8rem;font-weight:600;display:block;margin-bottom:4px">Duration (min)</label>
+        <input name="duration" type="number" value="40" min="5" max="180"
+               style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;font-size:.85rem"/>
+      </div>
+      <div>
+        <label style="font-size:.8rem;font-weight:600;display:block;margin-bottom:4px">Status</label>
+        <select name="status" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;font-size:.85rem">
+          <option value="draft">Draft</option>
+          <option value="active">Active</option>
+        </select>
+      </div>
     </div>
-    <div style="background:var(--surface2);border-radius:7px;padding:7px 10px">
-      <div style="font-size:.62rem;color:var(--ink3)">⏱ Duration</div>
-      <div style="font-weight:700;font-size:.875rem">{{ t.duration }} min</div>
-    </div>
-  </div>
-  <div style="display:flex;gap:5px">
-    <a href="/admin/tests/{{ t.id }}/questions" class="btn btn-secondary btn-sm" style="flex:1;justify-content:center">✏️ Questions</a>
-    <form method="POST" style="display:inline">
-      <input type="hidden" name="action" value="toggle"/>
-      <input type="hidden" name="test_id" value="{{ t.id }}"/>
-      <button type="submit" class="btn btn-sm {{ 'btn-danger' if t.status=='active' else 'btn-success' }}">{{ '⏸' if t.status=='active' else '▶' }}</button>
-    </form>
-    <form method="POST" style="display:inline" onsubmit="return confirm('Delete this test?')">
-      <input type="hidden" name="action" value="delete"/>
-      <input type="hidden" name="test_id" value="{{ t.id }}"/>
-      <button type="submit" class="btn btn-danger btn-sm">🗑</button>
-    </form>
-  </div>
-</div>
-{% else %}
-<div style="grid-column:1/-1;text-align:center;padding:48px;color:var(--ink3)">
-  <div style="font-size:2rem">📝</div>
-  <p style="margin-top:8px;font-size:.85rem">No tests yet. Create your first test above.</p>
-</div>
-{% endfor %}
+    <button type="submit" class="btn btn-primary">+ Create Test</button>
+    <span style="font-size:.78rem;color:var(--ink3);margin-left:10px">
+      <strong>All Grades</strong> creates the same test for Grade 3, 4 &amp; 5 at once.
+    </span>
+  </form>
 </div>
 
-<div class="modal-backdrop" id="addModal" style="display:none" onclick="if(event.target===this)this.style.display='none'">
-  <div class="modal">
-    <div class="modal-title">Create Mock Test <button class="modal-close" onclick="document.getElementById('addModal').style.display='none'">✕</button></div>
-    <form method="POST">
-      <input type="hidden" name="action" value="add"/>
-      <div class="form-group"><label class="form-label">Test Name</label><input class="form-input" name="name" placeholder="e.g. IBT English Set 3" required/></div>
-      <div class="form-row">
-        <div class="form-group"><label class="form-label">Subject</label>
-          <select class="form-input" name="subject">{% for s in subjects %}<option>{{ s }}</option>{% endfor %}</select>
-        </div>
-        <div class="form-group"><label class="form-label">Grade</label>
-        <select name="grade" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;font-size:.85rem">
-  <option value="All Grades">All Grades (3, 4 &amp; 5)</option>
-  <option value="Grade 3">Grade 3</option>
-  <option value="Grade 4">Grade 4</option>
-  <option value="Grade 5">Grade 5</option>
-</select>
-        </div>
+<!-- Test Cards -->
+<div style="margin-bottom:8px;font-size:.85rem;color:var(--ink3)">{{ tests|length }} total</div>
+<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:16px">
+  {% for t in tests %}
+  <div class="card" style="padding:18px" id="card-{{ t.id }}">
+
+    <!-- ── VIEW MODE ─────────────────────────────────────────── -->
+    <div id="view-{{ t.id }}">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px">
+        <div style="font-weight:700;font-size:.95rem">{{ t.name }}</div>
+        <span style="font-size:.75rem;font-weight:700;color:{{ '#16a34a' if t.status=='active' else '#f59e0b' }}">
+          {{ t.status }}
+        </span>
       </div>
-      <div class="form-row">
-        <div class="form-group"><label class="form-label">Difficulty</label>
-          <select class="form-input" name="difficulty"><option>Easy</option><option selected>Medium</option><option>Hard</option></select>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">
+        <span style="background:#eef2ff;color:#4f46e5;padding:2px 8px;border-radius:10px;font-size:.75rem">{{ t.subject }}</span>
+        <span style="background:#f0fdf4;color:#16a34a;padding:2px 8px;border-radius:10px;font-size:.75rem">{{ t.grade }}</span>
+        <span style="background:#fef9c3;color:#a16207;padding:2px 8px;border-radius:10px;font-size:.75rem">{{ t.difficulty }}</span>
+      </div>
+      <div style="font-size:.82rem;color:var(--ink3);margin-bottom:14px">
+        📝 {{ t.questions|from_json|length }} questions &nbsp;|&nbsp; ⏱ {{ t.duration }} min
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <a href="/admin/tests/{{ t.id }}/questions" class="btn btn-secondary btn-sm">✏ Questions</a>
+
+        <!-- Edit Settings button -->
+        <button onclick="toggleEdit({{ t.id }})"
+          style="background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe;padding:5px 10px;border-radius:5px;cursor:pointer;font-size:.8rem">
+          ⚙ Edit Settings
+        </button>
+
+        <!-- Toggle Active/Draft -->
+        <form method="POST" action="/admin/tests" style="display:inline">
+          <input type="hidden" name="action" value="toggle"/>
+          <input type="hidden" name="test_id" value="{{ t.id }}"/>
+          <button type="submit"
+            style="background:{{ '#fef3c7' if t.status=='active' else '#dcfce7' }};color:{{ '#92400e' if t.status=='active' else '#166534' }};border:none;padding:5px 10px;border-radius:5px;cursor:pointer;font-size:.8rem">
+            {{ '⏸ Deactivate' if t.status=='active' else '▶ Activate' }}
+          </button>
+        </form>
+
+        <!-- Delete -->
+        <form method="POST" action="/admin/tests"
+              onsubmit="return confirm('Delete {{ t.name }}? This cannot be undone.')"
+              style="display:inline">
+          <input type="hidden" name="action" value="delete"/>
+          <input type="hidden" name="test_id" value="{{ t.id }}"/>
+          <button type="submit"
+            style="background:#fee2e2;color:#dc2626;border:none;padding:5px 10px;border-radius:5px;cursor:pointer;font-size:.8rem">
+            🗑 Delete
+          </button>
+        </form>
+      </div>
+    </div>
+
+    <!-- ── EDIT MODE (hidden by default) ─────────────────────── -->
+    <div id="edit-{{ t.id }}" style="display:none">
+      <div style="font-weight:700;font-size:.9rem;margin-bottom:12px;color:#1d4ed8">⚙ Edit Test Settings</div>
+      <form method="POST" action="/admin/tests">
+        <input type="hidden" name="action" value="edit"/>
+        <input type="hidden" name="test_id" value="{{ t.id }}"/>
+        <div style="display:flex;flex-direction:column;gap:10px">
+          <div>
+            <label style="font-size:.78rem;font-weight:600;display:block;margin-bottom:3px">Title</label>
+            <input name="name" value="{{ t.name }}" required
+                   style="width:100%;padding:7px;border:1px solid var(--border);border-radius:5px;font-size:.83rem"/>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+            <div>
+              <label style="font-size:.78rem;font-weight:600;display:block;margin-bottom:3px">Subject</label>
+              <select name="subject" style="width:100%;padding:7px;border:1px solid var(--border);border-radius:5px;font-size:.83rem">
+                {% for s in subjects %}
+                  <option value="{{ s }}" {{ 'selected' if s==t.subject }}>{{ s }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div>
+              <label style="font-size:.78rem;font-weight:600;display:block;margin-bottom:3px">Grade</label>
+              <select name="grade" style="width:100%;padding:7px;border:1px solid var(--border);border-radius:5px;font-size:.83rem">
+                <option value="All Grades" {{ 'selected' if t.grade=='All Grades' }}>All Grades</option>
+                <option value="Grade 3" {{ 'selected' if t.grade=='Grade 3' }}>Grade 3</option>
+                <option value="Grade 4" {{ 'selected' if t.grade=='Grade 4' }}>Grade 4</option>
+                <option value="Grade 5" {{ 'selected' if t.grade=='Grade 5' }}>Grade 5</option>
+              </select>
+            </div>
+            <div>
+              <label style="font-size:.78rem;font-weight:600;display:block;margin-bottom:3px">Difficulty</label>
+              <select name="difficulty" style="width:100%;padding:7px;border:1px solid var(--border);border-radius:5px;font-size:.83rem">
+                <option value="Easy" {{ 'selected' if t.difficulty=='Easy' }}>Easy</option>
+                <option value="Medium" {{ 'selected' if t.difficulty=='Medium' }}>Medium</option>
+                <option value="Hard" {{ 'selected' if t.difficulty=='Hard' }}>Hard</option>
+              </select>
+            </div>
+            <div>
+              <label style="font-size:.78rem;font-weight:600;display:block;margin-bottom:3px">Duration (min)</label>
+              <input name="duration" type="number" value="{{ t.duration }}" min="5" max="180"
+                     style="width:100%;padding:7px;border:1px solid var(--border);border-radius:5px;font-size:.83rem"/>
+            </div>
+          </div>
+          <div>
+            <label style="font-size:.78rem;font-weight:600;display:block;margin-bottom:3px">Status</label>
+            <select name="status" style="width:100%;padding:7px;border:1px solid var(--border);border-radius:5px;font-size:.83rem">
+              <option value="draft" {{ 'selected' if t.status=='draft' }}>Draft</option>
+              <option value="active" {{ 'selected' if t.status=='active' }}>Active</option>
+            </select>
+          </div>
+          <div style="display:flex;gap:8px;margin-top:4px">
+            <button type="submit"
+              style="background:#1d4ed8;color:#fff;border:none;padding:7px 16px;border-radius:5px;cursor:pointer;font-size:.83rem">
+              💾 Save Changes
+            </button>
+            <button type="button" onclick="toggleEdit({{ t.id }})"
+              style="background:#f1f5f9;color:#475569;border:none;padding:7px 16px;border-radius:5px;cursor:pointer;font-size:.83rem">
+              Cancel
+            </button>
+          </div>
         </div>
-        <div class="form-group"><label class="form-label">Duration (min)</label>
-          <input class="form-input" type="number" name="duration" value="40" min="10" max="120"/>
-        </div>
-      </div>
-      <div class="form-group"><label class="form-label">Status</label>
-        <select class="form-input" name="status"><option value="draft">Draft — not visible to students</option><option value="active">Active — students can take this</option></select>
-      </div>
-      <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:8px">
-        <button type="button" class="btn btn-secondary" onclick="document.getElementById('addModal').style.display='none'">Cancel</button>
-        <button type="submit" class="btn btn-primary">Create Test</button>
-      </div>
-    </form>
+      </form>
+    </div>
+
   </div>
+  {% endfor %}
 </div>
+
+<script>
+function toggleEdit(id) {
+  const view = document.getElementById('view-' + id);
+  const edit = document.getElementById('edit-' + id);
+  if (edit.style.display === 'none') {
+    view.style.display = 'none';
+    edit.style.display = 'block';
+  } else {
+    edit.style.display = 'none';
+    view.style.display = 'block';
+  }
+}
+</script>
 {% endblock %}
