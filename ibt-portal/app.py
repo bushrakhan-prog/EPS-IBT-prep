@@ -421,6 +421,19 @@ def admin_tests():
                     duration=int(request.form['duration']), status=request.form['status']))
                 db.session.commit()
                 flash('Test created.', 'success')
+        elif action == 'edit':
+            test_id = request.form.get('test_id')
+            if test_id:
+                t = db.session.get(MockTest, int(test_id))
+                if t:
+                    t.name       = request.form.get('name', t.name)
+                    t.subject    = request.form.get('subject', t.subject)
+                    t.grade      = request.form.get('grade', t.grade)
+                    t.difficulty = request.form.get('difficulty', t.difficulty)
+                    t.duration   = int(request.form.get('duration', t.duration))
+                    t.status     = request.form.get('status', t.status)
+                    db.session.commit()
+                    flash('Test updated successfully.', 'success')
         elif action == 'delete':
             test_id = request.form.get('test_id')
             if test_id:
