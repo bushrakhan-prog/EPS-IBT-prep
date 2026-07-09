@@ -3,6 +3,7 @@ from flask_sqlalchemy import SQLAlchemy
 from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime
 import json, os, csv, io, re
+from pypdf import PdfReader
 from psycopg2cffi import compat
 compat.register()
 
@@ -96,6 +97,52 @@ def generate_password(name, grade):
     first3 = name[:3].capitalize()
     grade_num = re.sub(r'[^0-9]', '', grade)
     return f"EPS@{first3}{grade_num}"
+
+def parse_pdf_questions(file_stream):
+    """Parse IBT-style PDF question paper and return list of question dicts."""
+    reader = PdfReader(file_stream)
+    text = ""
+    for page in reader.pages:
+        text += page.extract_text() + "\n"
+    text = re.sub(r'  +', ' ', text)
+
+    # Extract answer key
+    answers = {}
+    ak_match = re.search(r'Answer\s+Key.*?(?=\Z)', text, re.DOTALL | re.IGNORECASE)
+    if ak_match:
+        ak_text = ak_match.group()
+        pairs = re.findall(r'(\d+)\s+([A-D])', ak_text)
+        for qnum, ans in pairs:
+            answers[int(qnum)] = ans
+        text = text[:ak_match.start()]
+
+    # Split into question blocks
+    question_blocks = re.split(r'\n(?=\d+\.\s)', text)
+    questions = []
+    for block in question_blocks:
+        block = block.strip()
+        num_match = re.match(r'^(\d+)\.\s+(.+)', block, re.DOTALL)
+        if not num_match:
+            continue
+        qnum = int(num_match.group(1))
+        rest = num_match.group(2).strip()
+        option_pattern = r'([A-D])\)\s+(.+?)(?=\s+[A-D]\)\s+|\Z)'
+        options_found = re.findall(option_pattern, rest, re.DOTALL)
+        if not options_found:
+            continue
+        first_opt_pos = re.search(r'[A-D]\)', rest)
+        q_text = rest[:first_opt_pos.start()].strip() if first_opt_pos else rest
+        opts = {letter: val.strip() for letter, val in options_found}
+        questions.append({
+            'id': qnum,
+            'section': 'General',
+            'passage': None,
+            'question': q_text,
+            'options': [opts.get('A',''), opts.get('B',''), opts.get('C',''), opts.get('D','')],
+            'answer': ['A','B','C','D'].index(answers.get(qnum,'A')) if answers.get(qnum,'A') in ['A','B','C','D'] else 0,
+        })
+    return questions
+
 
 def build_analytics():
     students    = User.query.filter_by(role='student').all()
@@ -476,6 +523,35 @@ def admin_questions(test_id):
         flash('Question added.', 'success')
     questions = json.loads(test.questions or '[]')
     return render_template('admin/questions.html', test=test, questions=questions, subject_sections=subject_sections)
+
+@app.route('/admin/tests/<int:test_id>/upload-pdf', methods=['POST'])
+@login_required('Resource_Manager')
+def upload_pdf_questions(test_id):
+    test = db.session.get(MockTest, test_id)
+    if not test:
+        flash('Test not found.', 'error')
+        return redirect(url_for('admin_tests'))
+    file = request.files.get('pdf_file')
+    if not file or not file.filename.endswith('.pdf'):
+        flash('Please upload a valid PDF file.', 'error')
+        return redirect(url_for('admin_questions', test_id=test_id))
+    try:
+        parsed = parse_pdf_questions(file.stream)
+        if not parsed:
+            flash('No questions found in PDF. Make sure it follows the IBT format.', 'error')
+            return redirect(url_for('admin_questions', test_id=test_id))
+        existing = json.loads(test.questions or '[]')
+        max_id = max((q['id'] for q in existing), default=0)
+        for q in parsed:
+            q['id'] = max_id + q['id']
+            existing.append(q)
+        test.questions = json.dumps(existing)
+        db.session.commit()
+        flash(f'✅ {len(parsed)} questions imported from PDF successfully!', 'success')
+    except Exception as e:
+        flash(f'❌ Error reading PDF: {str(e)}', 'error')
+    return redirect(url_for('admin_questions', test_id=test_id))
+
 
 @app.route('/admin/questions/delete/<int:test_id>/<int:q_id>', methods=['POST'])
 @login_required('Resource_Manager')
