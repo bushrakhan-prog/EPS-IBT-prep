@@ -102,15 +102,17 @@
         {% endif %}
         <div style="font-weight:600;font-size:.88rem;margin-bottom:8px">{{ q.question }}</div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px">
-          {% for i, opt in enumerate(q.options) if opt %}
-          <div style="font-size:.82rem;padding:4px 8px;border-radius:4px;
-            background:{{ '#dcfce7' if q.answer == i else '#f8fafc' }};
-            color:{{ '#166534' if q.answer == i else '#374151' }};
-            border:1px solid {{ '#86efac' if q.answer == i else '#e5e7eb' }}">
-            <strong>{{ ['A','B','C','D'][i] }})</strong> {{ opt }}
-            {% if q.answer == i %} ✓{% endif %}
-          </div>
-          {% endfor %}
+         {% for opt in q.options %}
+{% if opt %}
+<div style="font-size:.82rem;padding:4px 8px;border-radius:4px;
+  background:{{ '#dcfce7' if q.answer == loop.index0 else '#f8fafc' }};
+  color:{{ '#166534' if q.answer == loop.index0 else '#374151' }};
+  border:1px solid {{ '#86efac' if q.answer == loop.index0 else '#e5e7eb' }}">
+  <strong>{{ ['A','B','C','D'][loop.index0] }})</strong> {{ opt }}
+  {% if q.answer == loop.index0 %} ✓{% endif %}
+</div>
+{% endif %}
+{% endfor %}
         </div>
       </div>
       <form method="POST" action="/admin/questions/delete/{{ test.id }}/{{ q.id }}"
