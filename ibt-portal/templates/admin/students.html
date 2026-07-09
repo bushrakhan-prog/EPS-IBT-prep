@@ -1,103 +1,245 @@
-{% extends "base.html" %}
-{% block title %}Students — EPS IBT Portal{% endblock %}
+{% extends 'base.html' %}
+{% block title %}Students{% endblock %}
 {% block page_title %}Students{% endblock %}
-{% block back_button %}<a href="/admin" class="back-btn">← Back</a>{% endblock %}
+{% block back_button %}<a href="/admin" class="btn btn-secondary btn-sm">← Back</a>{% endblock %}
+
 {% block content %}
-<div class="sec-header">
-  <div><div class="sec-title">All Students</div><div class="sec-sub">{{ students|length }} enrolled</div></div>
-  <button class="btn btn-primary" onclick="document.getElementById('addModal').style.display='flex'">+ Add Student</button>
-</div>
-<div class="table-wrap">
-<table>
-  <thead><tr><th>Name</th><th>Username</th><th>Grade</th><th>Section</th><th>Tests</th><th>Avg</th><th>Joined</th><th>Actions</th></tr></thead>
-  <tbody>
-    {% for s in students %}
-    {% set rs = s.results %}
-    {% set avg = (rs|map(attribute='percent')|sum / rs|length)|round(1) if rs else 0 %}
-    <tr>
-      <td style="font-weight:600">{{ s.name }}</td>
-      <td style="font-family:monospace;color:var(--ink3)">{{ s.username }}</td>
-      <td><span class="badge badge-purple">{{ s.grade }}</span></td>
-      <td>{{ s.section or '—' }}</td>
-      <td><span class="badge badge-blue">{{ rs|length }}</span></td>
-      <td><span style="font-weight:700;color:{% if avg>=80 %}var(--green){% elif avg>=60 %}var(--amber){% elif avg>0 %}var(--red){% else %}var(--ink4){% endif %}">{% if rs %}{{ avg }}%{% else %}—{% endif %}</span></td>
-      <td style="color:var(--ink4)">{{ s.created.strftime('%d %b %Y') }}</td>
-      <td>
-        <div style="display:flex;gap:4px">
-          <button class="btn btn-secondary btn-xs" onclick="openEdit({{ s.id }},'{{ s.name }}','{{ s.grade }}','{{ s.section or 'A' }}')">Edit</button>
-          <form method="POST" style="display:inline" onsubmit="return confirm('Remove {{ s.name }}? All their test results will also be deleted.')">
-            <input type="hidden" name="action" value="delete"/>
-            <input type="hidden" name="user_id" value="{{ s.id }}"/>
-            <button type="submit" class="btn btn-danger btn-xs">Remove</button>
-          </form>
-        </div>
-      </td>
-    </tr>
-    {% endfor %}
-  </tbody>
-</table>
+
+<!-- Search + Header -->
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:10px">
+  <div>
+    <div style="font-weight:700;font-size:1rem">All Students</div>
+    <div style="font-size:.8rem;color:var(--ink3)" id="student-count">{{ students|length }} enrolled</div>
+  </div>
+  <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+    <!-- Search Box -->
+    <div style="position:relative">
+      <span style="position:absolute;left:10px;top:50%;transform:translateY(-50%);font-size:14px">🔍</span>
+      <input id="search-input" type="text" placeholder="Search by name, username, grade..."
+             oninput="filterStudents()"
+             style="padding:8px 12px 8px 32px;border:1px solid var(--border);border-radius:8px;font-size:.85rem;width:260px"/>
+    </div>
+    <!-- Grade Filter -->
+    <select id="grade-filter" onchange="filterStudents()"
+            style="padding:8px 12px;border:1px solid var(--border);border-radius:8px;font-size:.85rem">
+      <option value="">All Grades</option>
+      <option value="Grade 3">Grade 3</option>
+      <option value="Grade 4">Grade 4</option>
+      <option value="Grade 5">Grade 5</option>
+    </select>
+    <!-- Section Filter -->
+    <select id="section-filter" onchange="filterStudents()"
+            style="padding:8px 12px;border:1px solid var(--border);border-radius:8px;font-size:.85rem">
+      <option value="">All Sections</option>
+      <option value="A">Section A</option>
+      <option value="B">Section B</option>
+      <option value="C">Section C</option>
+      <option value="D">Section D</option>
+    </select>
+    <a href="/admin/students/upload" class="btn btn-secondary btn-sm">📂 Bulk Upload</a>
+    <button onclick="document.getElementById('add-modal').style.display='flex'"
+            class="btn btn-primary">+ Add Student</button>
+  </div>
 </div>
 
-<!-- Add Modal -->
-<div class="modal-backdrop" id="addModal" style="display:none" onclick="if(event.target===this)this.style.display='none'">
-  <div class="modal">
-    <div class="modal-title">Add Student <button class="modal-close" onclick="document.getElementById('addModal').style.display='none'">✕</button></div>
-    <form method="POST" autocomplete="off">
+<!-- Student Table -->
+<div class="card" style="padding:0;overflow:hidden">
+  <table class="data-table" id="student-table">
+    <thead>
+      <tr>
+        <th>#</th>
+        <th>Name</th>
+        <th>Username</th>
+        <th>Grade</th>
+        <th>Section</th>
+        <th>Tests</th>
+        <th>Avg</th>
+        <th>Joined</th>
+        <th>Actions</th>
+      </tr>
+    </thead>
+    <tbody id="student-tbody">
+      {% for s in students %}
+      <tr class="student-row"
+          data-name="{{ s.name|lower }}"
+          data-username="{{ s.username|lower }}"
+          data-grade="{{ s.grade }}"
+          data-section="{{ s.section }}">
+        <td style="color:var(--ink3);font-size:.8rem">{{ loop.index }}</td>
+        <td style="font-weight:600">{{ s.name }}</td>
+        <td><code style="background:#f0f2f5;padding:2px 6px;border-radius:4px;font-size:.8rem">{{ s.username }}</code></td>
+        <td>
+          <a href="#" onclick="document.getElementById('grade-filter').value='{{ s.grade }}';filterStudents();return false"
+             style="color:#4f46e5;text-decoration:none;font-size:.85rem">{{ s.grade }}</a>
+        </td>
+        <td style="text-align:center">{{ s.section or '—' }}</td>
+        <td style="text-align:center">{{ s.results|length }}</td>
+        <td style="text-align:center">
+          {% if s.results %}
+            {{ "%.0f"|format(s.results|map(attribute='percent')|list|sum / s.results|length) }}%
+          {% else %}—{% endif %}
+        </td>
+        <td style="font-size:.78rem;color:var(--ink3)">{{ s.created.strftime('%d %b %Y') }}</td>
+        <td>
+          <div style="display:flex;gap:6px">
+            <button onclick="openEdit({{ s.id }},'{{ s.name }}','{{ s.grade }}','{{ s.section }}')"
+              style="background:#eff6ff;color:#1d4ed8;border:none;padding:4px 10px;border-radius:4px;cursor:pointer;font-size:.78rem">
+              Edit
+            </button>
+            <form method="POST" action="/admin/students"
+                  onsubmit="return confirm('Remove {{ s.name }}?')" style="display:inline">
+              <input type="hidden" name="action" value="delete"/>
+              <input type="hidden" name="user_id" value="{{ s.id }}"/>
+              <button type="submit"
+                style="background:#fee2e2;color:#dc2626;border:none;padding:4px 10px;border-radius:4px;cursor:pointer;font-size:.78rem">
+                Remove
+              </button>
+            </form>
+          </div>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  <div id="no-results" style="display:none;padding:32px;text-align:center;color:var(--ink3)">
+    No students found matching your search.
+  </div>
+</div>
+
+<!-- ── ADD STUDENT MODAL ─────────────────────────────────── -->
+<div id="add-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:1000;align-items:center;justify-content:center">
+  <div style="background:#fff;border-radius:12px;padding:28px;width:420px;max-width:95vw;box-shadow:0 20px 60px rgba(0,0,0,.2)">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+      <h3 style="margin:0">Add New Student</h3>
+      <button onclick="document.getElementById('add-modal').style.display='none'"
+              style="background:none;border:none;font-size:20px;cursor:pointer;color:#888">✕</button>
+    </div>
+    <form method="POST" action="/admin/students">
       <input type="hidden" name="action" value="add"/>
-      <div class="form-group"><label class="form-label">Full Name</label><input class="form-input" name="name" placeholder="e.g. Ananya Sharma" required autocomplete="off"/></div>
-      <div class="form-row">
-        <div class="form-group"><label class="form-label">Username</label><input class="form-input" name="username" placeholder="ananya" required autocomplete="off"/></div>
-        <div class="form-group"><label class="form-label">Password</label><input class="form-input" type="password" name="password" placeholder="Set password" required autocomplete="new-password"/></div>
-      </div>
-      <div class="form-row">
-        <div class="form-group"><label class="form-label">Grade</label>
-          <select class="form-input" name="grade">{% for g in grades %}<option>{{ g }}</option>{% endfor %}</select>
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <div>
+          <label style="font-size:.8rem;font-weight:600;display:block;margin-bottom:3px">Full Name</label>
+          <input name="name" required placeholder="e.g. Ahmed Khan"
+                 style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;font-size:.85rem"/>
         </div>
-        <div class="form-group"><label class="form-label">Section</label>
-          <select class="form-input" name="section"><option>A</option><option>B</option><option>C</option></select>
+        <div>
+          <label style="font-size:.8rem;font-weight:600;display:block;margin-bottom:3px">Username</label>
+          <input name="username" required placeholder="e.g. ahmed_01"
+                 style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;font-size:.85rem"/>
         </div>
-      </div>
-      <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:8px">
-        <button type="button" class="btn btn-secondary" onclick="document.getElementById('addModal').style.display='none'">Cancel</button>
-        <button type="submit" class="btn btn-primary">Add Student</button>
+        <div>
+          <label style="font-size:.8rem;font-weight:600;display:block;margin-bottom:3px">Password</label>
+          <input name="password" required placeholder="e.g. ahm@01"
+                 style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;font-size:.85rem"/>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+          <div>
+            <label style="font-size:.8rem;font-weight:600;display:block;margin-bottom:3px">Grade</label>
+            <select name="grade" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;font-size:.85rem">
+              <option>Grade 3</option><option>Grade 4</option><option>Grade 5</option>
+            </select>
+          </div>
+          <div>
+            <label style="font-size:.8rem;font-weight:600;display:block;margin-bottom:3px">Section</label>
+            <select name="section" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;font-size:.85rem">
+              <option>A</option><option>B</option><option>C</option><option>D</option>
+            </select>
+          </div>
+        </div>
+        <div style="display:flex;gap:8px;margin-top:6px">
+          <button type="submit" class="btn btn-primary" style="flex:1">Add Student</button>
+          <button type="button" onclick="document.getElementById('add-modal').style.display='none'"
+                  class="btn btn-secondary" style="flex:1">Cancel</button>
+        </div>
       </div>
     </form>
   </div>
 </div>
 
-<!-- Edit Modal -->
-<div class="modal-backdrop" id="editModal" style="display:none" onclick="if(event.target===this)this.style.display='none'">
-  <div class="modal">
-    <div class="modal-title">Edit Student <button class="modal-close" onclick="document.getElementById('editModal').style.display='none'">✕</button></div>
-    <form method="POST" autocomplete="off">
+<!-- ── EDIT STUDENT MODAL ─────────────────────────────────── -->
+<div id="edit-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:1000;align-items:center;justify-content:center">
+  <div style="background:#fff;border-radius:12px;padding:28px;width:420px;max-width:95vw;box-shadow:0 20px 60px rgba(0,0,0,.2)">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+      <h3 style="margin:0">Edit Student</h3>
+      <button onclick="document.getElementById('edit-modal').style.display='none'"
+              style="background:none;border:none;font-size:20px;cursor:pointer;color:#888">✕</button>
+    </div>
+    <form method="POST" action="/admin/students">
       <input type="hidden" name="action" value="edit"/>
-      <input type="hidden" name="user_id" id="editId"/>
-      <div class="form-group"><label class="form-label">Full Name</label><input class="form-input" name="name" id="editName" required autocomplete="off"/></div>
-      <div class="form-row">
-        <div class="form-group"><label class="form-label">Grade</label>
-          <select class="form-input" name="grade" id="editGrade">{% for g in grades %}<option>{{ g }}</option>{% endfor %}</select>
+      <input type="hidden" name="user_id" id="edit-user-id"/>
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <div>
+          <label style="font-size:.8rem;font-weight:600;display:block;margin-bottom:3px">Full Name</label>
+          <input name="name" id="edit-name" required
+                 style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;font-size:.85rem"/>
         </div>
-        <div class="form-group"><label class="form-label">Section</label>
-          <select class="form-input" name="section" id="editSection"><option>A</option><option>B</option><option>C</option></select>
+        <div>
+          <label style="font-size:.8rem;font-weight:600;display:block;margin-bottom:3px">New Password <span style="font-weight:400;color:#888">(leave blank to keep same)</span></label>
+          <input name="password" placeholder="Leave blank to keep unchanged"
+                 style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;font-size:.85rem"/>
         </div>
-      </div>
-      <div class="form-group"><label class="form-label">New Password <span style="color:var(--ink4)">(leave blank to keep current)</span></label><input class="form-input" type="password" name="password" autocomplete="new-password"/></div>
-      <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:8px">
-        <button type="button" class="btn btn-secondary" onclick="document.getElementById('editModal').style.display='none'">Cancel</button>
-        <button type="submit" class="btn btn-primary">Save Changes</button>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+          <div>
+            <label style="font-size:.8rem;font-weight:600;display:block;margin-bottom:3px">Grade</label>
+            <select name="grade" id="edit-grade" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;font-size:.85rem">
+              <option>Grade 3</option><option>Grade 4</option><option>Grade 5</option>
+            </select>
+          </div>
+          <div>
+            <label style="font-size:.8rem;font-weight:600;display:block;margin-bottom:3px">Section</label>
+            <select name="section" id="edit-section" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;font-size:.85rem">
+              <option>A</option><option>B</option><option>C</option><option>D</option>
+            </select>
+          </div>
+        </div>
+        <div style="display:flex;gap:8px;margin-top:6px">
+          <button type="submit" class="btn btn-primary" style="flex:1">💾 Save Changes</button>
+          <button type="button" onclick="document.getElementById('edit-modal').style.display='none'"
+                  class="btn btn-secondary" style="flex:1">Cancel</button>
+        </div>
       </div>
     </form>
   </div>
 </div>
-{% endblock %}
-{% block scripts %}
+
 <script>
-function openEdit(id,name,grade,section){
-  document.getElementById('editId').value=id;
-  document.getElementById('editName').value=name;
-  document.getElementById('editGrade').value=grade;
-  document.getElementById('editSection').value=section||'A';
-  document.getElementById('editModal').style.display='flex';
+// ── Search & Filter ───────────────────────────────────────────
+function filterStudents() {
+  const search  = document.getElementById('search-input').value.toLowerCase().trim();
+  const grade   = document.getElementById('grade-filter').value;
+  const section = document.getElementById('section-filter').value;
+  const rows    = document.querySelectorAll('.student-row');
+  let visible   = 0;
+
+  rows.forEach(row => {
+    const matchSearch  = !search  || row.dataset.name.includes(search) || row.dataset.username.includes(search);
+    const matchGrade   = !grade   || row.dataset.grade   === grade;
+    const matchSection = !section || row.dataset.section === section;
+    const show = matchSearch && matchGrade && matchSection;
+    row.style.display = show ? '' : 'none';
+    if (show) visible++;
+  });
+
+  document.getElementById('student-count').textContent = visible + ' student' + (visible !== 1 ? 's' : '') + ' shown';
+  document.getElementById('no-results').style.display = visible === 0 ? 'block' : 'none';
 }
+
+// ── Edit Modal ────────────────────────────────────────────────
+function openEdit(id, name, grade, section) {
+  document.getElementById('edit-user-id').value  = id;
+  document.getElementById('edit-name').value     = name;
+  const gradeEl = document.getElementById('edit-grade');
+  const secEl   = document.getElementById('edit-section');
+  for (let o of gradeEl.options)   o.selected = o.value === grade;
+  for (let o of secEl.options)     o.selected = o.value === section;
+  document.getElementById('edit-modal').style.display = 'flex';
+}
+
+// Close modals on backdrop click
+['add-modal','edit-modal'].forEach(id => {
+  document.getElementById(id).addEventListener('click', function(e) {
+    if (e.target === this) this.style.display = 'none';
+  });
+});
 </script>
 {% endblock %}
