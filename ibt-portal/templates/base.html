@@ -20,7 +20,6 @@
       <a href="/admin" class="nav-link {% if request.path=='/admin' %}active{% endif %}"><span class="nav-icon">🏠</span>Dashboard</a>
       <div class="nav-section">Manage</div>
      <a href="/admin/students" class="nav-link {% if 'students' in request.path and 'upload' not in request.path %}active{% endif %}"><span class="nav-icon">👨‍🎓</span>Students</a>
-      <a href="/admin/students/upload" class="nav-link {% if 'upload' in request.path %}active{% endif %}"><span class="nav-icon">📂</span>Bulk Upload</a>
       <a href="/admin/teachers"
       <a href="/admin/teachers" class="nav-link {% if 'teachers' in request.path %}active{% endif %}"><span class="nav-icon">👩‍🏫</span>Teachers</a>
       <a href="/admin/tests" class="nav-link {% if 'tests' in request.path or 'questions' in request.path %}active{% endif %}"><span class="nav-icon">📝</span>Mock Tests</a>
