@@ -12,6 +12,10 @@ app.secret_key = 'eps-ibt-portal-secret-key'
 app.jinja_env.filters['from_json'] = json.loads
 app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'sqlite:///database.db').replace('postgres://', 'postgresql://')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
+    'pool_pre_ping': True,
+    'pool_recycle': 300,
+}
 db = SQLAlchemy(app)
 
 SUBJECTS  = ['English', 'Mathematics', 'Science', 'Reasoning']
