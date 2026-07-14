@@ -2,7 +2,7 @@ from flask import Flask, render_template, request, redirect, url_for, session, j
 from flask_sqlalchemy import SQLAlchemy
 from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime
-import json, os, csv, io, re
+import json, os, csv, io, re, base64
 from pypdf import PdfReader
 from psycopg2cffi import compat
 compat.register()
@@ -12,10 +12,6 @@ app.secret_key = 'eps-ibt-portal-secret-key'
 app.jinja_env.filters['from_json'] = json.loads
 app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'sqlite:///database.db').replace('postgres://', 'postgresql://')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
-    'pool_pre_ping': True,
-    'pool_recycle': 300,
-}
 db = SQLAlchemy(app)
 
 SUBJECTS  = ['English', 'Mathematics', 'Science', 'Reasoning']
@@ -514,13 +510,25 @@ def admin_questions(test_id):
     subject_sections = SECTIONS_BY_SUBJECT.get(test.subject, ['General'])
     if request.method == 'POST':
         qs = json.loads(test.questions or '[]')
+        # Handle image upload — store as base64
+        image_data = None
+        img_file = request.files.get('question_image')
+        if img_file and img_file.filename:
+            ext = img_file.filename.rsplit('.', 1)[-1].lower()
+            mime = {'jpg':'image/jpeg','jpeg':'image/jpeg','png':'image/png','gif':'image/gif','webp':'image/webp'}.get(ext,'image/png')
+            raw = img_file.read()
+            if len(raw) < 2 * 1024 * 1024:  # max 2MB
+                image_data = f"data:{mime};base64,{base64.b64encode(raw).decode()}"
+            else:
+                flash('Image too large — please use an image under 2MB.', 'error')
         qs.append({
             'id': max((q['id'] for q in qs), default=0) + 1,
             'section': request.form['section'],
             'passage': request.form.get('passage') or None,
             'question': request.form['question'],
             'options': [request.form.get(f'opt{i}','') for i in range(4)],
-            'answer': int(request.form['answer'])
+            'answer': int(request.form['answer']),
+            'image': image_data,
         })
         test.questions = json.dumps(qs)
         db.session.commit()
