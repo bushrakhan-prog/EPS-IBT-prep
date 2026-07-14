@@ -34,7 +34,13 @@
     {% if q.passage %}
     <div class="quiz-passage">{{ q.passage }}</div>
     {% endif %}
-    <div class="quiz-q">{{ q.question }}</div>
+   <div class="quiz-q">{{ q.question }}</div>
+{% if q.get('image') %}
+<div style="margin:10px 0">
+  <img src="{{ q.image }}" alt="Question image"
+       style="max-width:100%;max-height:280px;border-radius:8px;border:1px solid #e2e8f0;display:block"/>
+</div>
+{% endif %}
     {% for opt in q.options %}
     <div class="quiz-opt" data-qid="{{ q.id }}" data-idx="{{ loop.index0 }}" onclick="selectOpt(this, {{ q.id }}, {{ loop.index0 }})">
       <div class="opt-letter">{{ ['A','B','C','D'][loop.index0] }}</div>
