@@ -576,6 +576,41 @@ def delete_question(test_id, q_id):
         flash('Question deleted.', 'success')
     return redirect(url_for('admin_questions', test_id=test_id))
 
+
+@app.route('/admin/questions/edit/<int:test_id>/<int:q_id>', methods=['POST'])
+@login_required('Resource_Manager')
+def edit_question(test_id, q_id):
+    test = db.session.get(MockTest, test_id)
+    if not test:
+        flash('Test not found.', 'error')
+        return redirect(url_for('admin_tests'))
+    qs = json.loads(test.questions or '[]')
+    for q in qs:
+        if q['id'] == q_id:
+            q['question'] = request.form.get('question', q['question'])
+            q['section']  = request.form.get('section', q.get('section', 'General'))
+            q['passage']  = request.form.get('passage') or None
+            q['options']  = [request.form.get(f'opt{i}', q['options'][i] if i < len(q['options']) else '') for i in range(4)]
+            q['answer']   = int(request.form.get('answer', q['answer']))
+            # Handle image update
+            img_file = request.files.get('question_image')
+            if img_file and img_file.filename:
+                ext = img_file.filename.rsplit('.', 1)[-1].lower()
+                mime = {'jpg':'image/jpeg','jpeg':'image/jpeg','png':'image/png','gif':'image/gif','webp':'image/webp'}.get(ext,'image/png')
+                raw = img_file.read()
+                if len(raw) < 2 * 1024 * 1024:
+                    q['image'] = f"data:{mime};base64,{base64.b64encode(raw).decode()}"
+                else:
+                    flash('Image too large — max 2MB.', 'error')
+            # Remove image if checkbox ticked
+            if request.form.get('remove_image'):
+                q['image'] = None
+            break
+    test.questions = json.dumps(qs)
+    db.session.commit()
+    flash('Question updated.', 'success')
+    return redirect(url_for('admin_questions', test_id=test_id))
+
 @app.route('/admin/analytics')
 @login_required('Resource_Manager')
 def admin_analytics():
