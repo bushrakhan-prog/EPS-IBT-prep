@@ -1,262 +1,245 @@
 {% extends 'base.html' %}
-{% block title %}Questions — {{ test.name }}{% endblock %}
-{% block page_title %}{{ test.name }} — Questions{% endblock %}
-{% block back_button %}<a href="/admin/tests" class="btn btn-secondary btn-sm">← Back to Tests</a>{% endblock %}
+{% block title %}Students{% endblock %}
+{% block page_title %}Students{% endblock %}
+{% block back_button %}<a href="/admin" class="btn btn-secondary btn-sm">← Back</a>{% endblock %}
 
 {% block content %}
 
-<!-- Test Info Bar -->
-<div style="display:flex;gap:10px;align-items:center;margin-bottom:20px;flex-wrap:wrap">
-  <span style="background:#eef2ff;color:#4f46e5;padding:4px 12px;border-radius:10px;font-size:.82rem">{{ test.subject }}</span>
-  <span style="background:#f0fdf4;color:#16a34a;padding:4px 12px;border-radius:10px;font-size:.82rem">{{ test.grade }}</span>
-  <span style="background:#fef9c3;color:#a16207;padding:4px 12px;border-radius:10px;font-size:.82rem">{{ test.difficulty }}</span>
-  <span style="background:#f1f5f9;color:#475569;padding:4px 12px;border-radius:10px;font-size:.82rem">⏱ {{ test.duration }} min</span>
-  <span style="background:{{ '#dcfce7' if test.status=='active' else '#fef9c3' }};color:{{ '#166534' if test.status=='active' else '#92400e' }};padding:4px 12px;border-radius:10px;font-size:.82rem">{{ test.status }}</span>
-  <span style="font-size:.82rem;color:var(--ink3);margin-left:auto">{{ questions|length }} question{{ 's' if questions|length != 1 }}</span>
-</div>
-
-<!-- PDF Import -->
-<div class="card" style="margin-bottom:20px;border:2px dashed #c7d2fe;background:#f5f7ff">
-  <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap">
-    <div style="font-size:2rem">📄</div>
-    <div style="flex:1">
-      <div style="font-weight:700;font-size:.95rem;color:#3730a3;margin-bottom:2px">Import Questions from PDF</div>
-      <div style="font-size:.8rem;color:#6366f1">Upload your IBT-format PDF — questions, options and answers imported automatically</div>
+<!-- Search + Header -->
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:10px">
+  <div>
+    <div style="font-weight:700;font-size:1rem">All Students</div>
+    <div style="font-size:.8rem;color:var(--ink3)" id="student-count">{{ students|length }} enrolled</div>
+  </div>
+  <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+    <!-- Search Box -->
+    <div style="position:relative">
+      <span style="position:absolute;left:10px;top:50%;transform:translateY(-50%);font-size:14px">🔍</span>
+      <input id="search-input" type="text" placeholder="Search by name, username, grade..."
+             oninput="filterStudents()"
+             style="padding:8px 12px 8px 32px;border:1px solid var(--border);border-radius:8px;font-size:.85rem;width:260px"/>
     </div>
-    <form method="POST" action="/admin/tests/{{ test.id }}/upload-pdf" enctype="multipart/form-data"
-          style="display:flex;gap:8px;align-items:center">
-      <input type="file" name="pdf_file" accept=".pdf" required
-             style="font-size:.82rem;border:1px solid #c7d2fe;border-radius:6px;padding:6px"/>
-      <button type="submit" style="background:#4f46e5;color:#fff;border:none;padding:8px 16px;border-radius:6px;cursor:pointer;font-size:.83rem;white-space:nowrap">
-        📥 Import PDF
-      </button>
-    </form>
+    <!-- Grade Filter -->
+    <select id="grade-filter" onchange="filterStudents()"
+            style="padding:8px 12px;border:1px solid var(--border);border-radius:8px;font-size:.85rem">
+      <option value="">All Grades</option>
+      <option value="Grade 3">Grade 3</option>
+      <option value="Grade 4">Grade 4</option>
+      <option value="Grade 5">Grade 5</option>
+    </select>
+    <!-- Section Filter -->
+    <select id="section-filter" onchange="filterStudents()"
+            style="padding:8px 12px;border:1px solid var(--border);border-radius:8px;font-size:.85rem">
+      <option value="">All Sections</option>
+      <option value="A">Section A</option>
+      <option value="B">Section B</option>
+      <option value="C">Section C</option>
+      <option value="D">Section D</option>
+    </select>
+    <a href="/admin/students/upload" class="btn btn-secondary btn-sm">📂 Bulk Upload</a>
+    <button onclick="document.getElementById('add-modal').style.display='flex'"
+            class="btn btn-primary">+ Add Student</button>
   </div>
 </div>
 
-<!-- Add Question Manually -->
-<details style="margin-bottom:20px">
-  <summary style="cursor:pointer;font-weight:700;font-size:.9rem;padding:12px 16px;background:#fff;border:1px solid var(--border);border-radius:8px;list-style:none">
-    ✏ Add Question Manually &nbsp;<span style="font-size:.78rem;color:var(--ink3);font-weight:400">(click to expand)</span>
-  </summary>
-  <div class="card" style="border-top-left-radius:0;border-top-right-radius:0;border-top:none;margin-top:0">
-    <form method="POST" action="/admin/tests/{{ test.id }}/questions" enctype="multipart/form-data">
-      <div style="margin-bottom:10px">
-        <label style="font-size:.78rem;font-weight:600;display:block;margin-bottom:3px">Section</label>
-        <select name="section" style="width:200px;padding:7px;border:1px solid var(--border);border-radius:5px;font-size:.83rem">
-          {% for s in subject_sections %}<option>{{ s }}</option>{% endfor %}
-        </select>
-      </div>
-      <div style="margin-bottom:10px">
-        <label style="font-size:.78rem;font-weight:600;display:block;margin-bottom:3px">Passage (optional)</label>
-        <textarea name="passage" rows="2" placeholder="Leave blank if no reading passage"
-                  style="width:100%;padding:7px;border:1px solid var(--border);border-radius:5px;font-size:.83rem"></textarea>
-      </div>
-      <div style="margin-bottom:10px">
-        <label style="font-size:.78rem;font-weight:600;display:block;margin-bottom:3px">Question</label>
-        <textarea name="question" rows="2" required
-                  style="width:100%;padding:7px;border:1px solid var(--border);border-radius:5px;font-size:.83rem"></textarea>
-      </div>
-      <div style="margin-bottom:12px;padding:12px;background:#f8fafc;border:1px dashed #cbd5e1;border-radius:8px">
-        <label style="font-size:.78rem;font-weight:600;display:block;margin-bottom:6px">
-          🖼 Attach Image <span style="font-weight:400;color:#888">(optional, max 2MB)</span>
-        </label>
-        <input type="file" name="question_image" accept="image/*" id="add-img-input" onchange="previewImg(this,'add-preview')"
-               style="font-size:.82rem;border:1px solid #cbd5e1;border-radius:6px;padding:6px;width:100%"/>
-        <div id="add-preview" style="display:none;margin-top:8px">
-          <img src="" style="max-width:280px;max-height:180px;border-radius:6px;border:1px solid #e2e8f0"/>
-          <button type="button" onclick="clearImg('add-img-input','add-preview')"
-            style="display:block;margin-top:4px;background:#fee2e2;color:#dc2626;border:none;padding:3px 10px;border-radius:4px;cursor:pointer;font-size:.75rem">✕ Remove</button>
-        </div>
-      </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
-        {% for i in range(4) %}
-        <div>
-          <label style="font-size:.78rem;font-weight:600;display:block;margin-bottom:3px">Option {{ ['A','B','C','D'][i] }}</label>
-          <input name="opt{{ i }}" style="width:100%;padding:7px;border:1px solid var(--border);border-radius:5px;font-size:.83rem"/>
-        </div>
-        {% endfor %}
-      </div>
-      <div style="margin-bottom:12px">
-        <label style="font-size:.78rem;font-weight:600;display:block;margin-bottom:3px">Correct Answer</label>
-        <select name="answer" style="width:200px;padding:7px;border:1px solid var(--border);border-radius:5px;font-size:.83rem">
-          <option value="0">A</option><option value="1">B</option><option value="2">C</option><option value="3">D</option>
-        </select>
-      </div>
-      <button type="submit" class="btn btn-primary">+ Add Question</button>
-    </form>
-  </div>
-</details>
-
-<!-- Question List -->
-{% if questions %}
-<div style="display:flex;flex-direction:column;gap:12px">
-  {% for q in questions %}
-  <div class="card" style="padding:16px" id="qcard-{{ q.id }}">
-
-    <!-- VIEW MODE -->
-    <div id="qview-{{ q.id }}">
-      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px">
-        <div style="flex:1">
-          <div style="font-size:.75rem;color:#6366f1;font-weight:600;margin-bottom:4px">
-            Q{{ loop.index }} &nbsp;·&nbsp; {{ q.section }}
-          </div>
-          {% if q.passage %}
-          <div style="background:#f8fafc;border-left:3px solid #c7d2fe;padding:8px 12px;font-size:.82rem;color:#475569;margin-bottom:8px;border-radius:0 4px 4px 0">
-            {{ q.passage }}
-          </div>
-          {% endif %}
-          <div style="font-weight:600;font-size:.88rem;margin-bottom:8px">{{ q.question }}</div>
-          {% if q.get('image') %}
-          <div style="margin-bottom:10px">
-            <img src="{{ q.image }}" alt="Question image"
-                 style="max-width:320px;max-height:220px;border-radius:8px;border:1px solid #e2e8f0;display:block"/>
-          </div>
-          {% endif %}
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px">
-            {% for opt in q.options %}{% if opt %}
-            <div style="font-size:.82rem;padding:4px 8px;border-radius:4px;
-              background:{{ '#dcfce7' if q.answer == loop.index0 else '#f8fafc' }};
-              color:{{ '#166534' if q.answer == loop.index0 else '#374151' }};
-              border:1px solid {{ '#86efac' if q.answer == loop.index0 else '#e5e7eb' }}">
-              <strong>{{ ['A','B','C','D'][loop.index0] }})</strong> {{ opt }}
-              {% if q.answer == loop.index0 %} ✓{% endif %}
-            </div>
-            {% endif %}{% endfor %}
-          </div>
-        </div>
-        <!-- Action buttons -->
-        <div style="display:flex;flex-direction:column;gap:6px;min-width:80px">
-          <button onclick="toggleQEdit({{ q.id }})"
-            style="background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe;padding:5px 10px;border-radius:5px;cursor:pointer;font-size:.78rem">
-            ✏ Edit
-          </button>
-          <form method="POST" action="/admin/questions/delete/{{ test.id }}/{{ q.id }}"
-                onsubmit="return confirm('Delete this question?')">
-            <button type="submit"
-              style="width:100%;background:#fee2e2;color:#dc2626;border:none;padding:5px 10px;border-radius:5px;cursor:pointer;font-size:.78rem">
-              🗑 Delete
+<!-- Student Table -->
+<div class="card" style="padding:0;overflow:hidden">
+  <table class="data-table" id="student-table">
+    <thead>
+      <tr>
+        <th>#</th>
+        <th>Name</th>
+        <th>Username</th>
+        <th>Grade</th>
+        <th>Section</th>
+        <th>Tests</th>
+        <th>Avg</th>
+        <th>Joined</th>
+        <th>Actions</th>
+      </tr>
+    </thead>
+    <tbody id="student-tbody">
+      {% for s in students %}
+      <tr class="student-row"
+          data-name="{{ s.name|lower }}"
+          data-username="{{ s.username|lower }}"
+          data-grade="{{ s.grade }}"
+          data-section="{{ s.section }}">
+        <td style="color:var(--ink3);font-size:.8rem">{{ loop.index }}</td>
+        <td style="font-weight:600">{{ s.name }}</td>
+        <td><code style="background:#f0f2f5;padding:2px 6px;border-radius:4px;font-size:.8rem">{{ s.username }}</code></td>
+        <td>
+          <a href="#" onclick="document.getElementById('grade-filter').value='{{ s.grade }}';filterStudents();return false"
+             style="color:#4f46e5;text-decoration:none;font-size:.85rem">{{ s.grade }}</a>
+        </td>
+        <td style="text-align:center">{{ s.section or '—' }}</td>
+        <td style="text-align:center">{{ s.results|length }}</td>
+        <td style="text-align:center">
+          {% if s.results %}
+            {{ "%.0f"|format(s.results|map(attribute='percent')|list|sum / s.results|length) }}%
+          {% else %}—{% endif %}
+        </td>
+        <td style="font-size:.78rem;color:var(--ink3)">{{ s.created.strftime('%d %b %Y') }}</td>
+        <td>
+          <div style="display:flex;gap:6px">
+            <button onclick="openEdit({{ s.id }},'{{ s.name }}','{{ s.grade }}','{{ s.section }}')"
+              style="background:#eff6ff;color:#1d4ed8;border:none;padding:4px 10px;border-radius:4px;cursor:pointer;font-size:.78rem">
+              Edit
             </button>
-          </form>
+            <form method="POST" action="/admin/students"
+                  onsubmit="return confirm('Remove {{ s.name }}?')" style="display:inline">
+              <input type="hidden" name="action" value="delete"/>
+              <input type="hidden" name="user_id" value="{{ s.id }}"/>
+              <button type="submit"
+                style="background:#fee2e2;color:#dc2626;border:none;padding:4px 10px;border-radius:4px;cursor:pointer;font-size:.78rem">
+                Remove
+              </button>
+            </form>
+          </div>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  <div id="no-results" style="display:none;padding:32px;text-align:center;color:var(--ink3)">
+    No students found matching your search.
+  </div>
+</div>
+
+<!-- ── ADD STUDENT MODAL ─────────────────────────────────── -->
+<div id="add-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:1000;align-items:center;justify-content:center">
+  <div style="background:#fff;border-radius:12px;padding:28px;width:420px;max-width:95vw;box-shadow:0 20px 60px rgba(0,0,0,.2)">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+      <h3 style="margin:0">Add New Student</h3>
+      <button onclick="document.getElementById('add-modal').style.display='none'"
+              style="background:none;border:none;font-size:20px;cursor:pointer;color:#888">✕</button>
+    </div>
+    <form method="POST" action="/admin/students">
+      <input type="hidden" name="action" value="add"/>
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <div>
+          <label style="font-size:.8rem;font-weight:600;display:block;margin-bottom:3px">Full Name</label>
+          <input name="name" required placeholder="e.g. Ahmed Khan"
+                 style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;font-size:.85rem"/>
+        </div>
+        <div>
+          <label style="font-size:.8rem;font-weight:600;display:block;margin-bottom:3px">Username</label>
+          <input name="username" required placeholder="e.g. ahmed_01"
+                 style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;font-size:.85rem"/>
+        </div>
+        <div>
+          <label style="font-size:.8rem;font-weight:600;display:block;margin-bottom:3px">Password</label>
+          <input name="password" required placeholder="e.g. ahm@01"
+                 style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;font-size:.85rem"/>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+          <div>
+            <label style="font-size:.8rem;font-weight:600;display:block;margin-bottom:3px">Grade</label>
+            <select name="grade" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;font-size:.85rem">
+              <option>Grade 3</option><option>Grade 4</option><option>Grade 5</option>
+            </select>
+          </div>
+          <div>
+            <label style="font-size:.8rem;font-weight:600;display:block;margin-bottom:3px">Section</label>
+            <select name="section" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;font-size:.85rem">
+              <option>A</option><option>B</option><option>C</option><option>D</option>
+            </select>
+          </div>
+        </div>
+        <div style="display:flex;gap:8px;margin-top:6px">
+          <button type="submit" class="btn btn-primary" style="flex:1">Add Student</button>
+          <button type="button" onclick="document.getElementById('add-modal').style.display='none'"
+                  class="btn btn-secondary" style="flex:1">Cancel</button>
         </div>
       </div>
-    </div>
-
-    <!-- EDIT MODE (hidden by default) -->
-    <div id="qedit-{{ q.id }}" style="display:none">
-      <div style="font-weight:700;font-size:.88rem;color:#1d4ed8;margin-bottom:12px">✏ Edit Question {{ loop.index }}</div>
-      <form method="POST" action="/admin/questions/edit/{{ test.id }}/{{ q.id }}" enctype="multipart/form-data">
-        <div style="margin-bottom:8px">
-          <label style="font-size:.75rem;font-weight:600;display:block;margin-bottom:3px">Section</label>
-          <select name="section" style="width:200px;padding:6px;border:1px solid var(--border);border-radius:5px;font-size:.82rem">
-            {% for s in subject_sections %}
-            <option {{ 'selected' if s == q.section }}>{{ s }}</option>
-            {% endfor %}
-          </select>
-        </div>
-        <div style="margin-bottom:8px">
-          <label style="font-size:.75rem;font-weight:600;display:block;margin-bottom:3px">Passage</label>
-          <textarea name="passage" rows="2"
-                    style="width:100%;padding:6px;border:1px solid var(--border);border-radius:5px;font-size:.82rem">{{ q.passage or '' }}</textarea>
-        </div>
-        <div style="margin-bottom:8px">
-          <label style="font-size:.75rem;font-weight:600;display:block;margin-bottom:3px">Question Text</label>
-          <textarea name="question" rows="2" required
-                    style="width:100%;padding:6px;border:1px solid var(--border);border-radius:5px;font-size:.82rem">{{ q.question }}</textarea>
-        </div>
-
-        <!-- Image section -->
-        <div style="margin-bottom:10px;padding:10px;background:#f8fafc;border:1px dashed #cbd5e1;border-radius:8px">
-          <label style="font-size:.75rem;font-weight:600;display:block;margin-bottom:6px">🖼 Image</label>
-          {% if q.get('image') %}
-          <div style="margin-bottom:8px">
-            <img src="{{ q.image }}" style="max-width:200px;max-height:140px;border-radius:6px;border:1px solid #e2e8f0;display:block;margin-bottom:6px"/>
-            <label style="font-size:.75rem;display:flex;align-items:center;gap:6px;color:#dc2626">
-              <input type="checkbox" name="remove_image" value="1"/> Remove current image
-            </label>
-          </div>
-          {% endif %}
-          <label style="font-size:.75rem;display:block;margin-bottom:4px;color:#555">
-            {{ 'Replace image:' if q.get('image') else 'Add image:' }} (max 2MB)
-          </label>
-          <input type="file" name="question_image" accept="image/*"
-                 id="edit-img-{{ q.id }}" onchange="previewImg(this,'edit-preview-{{ q.id }}')"
-                 style="font-size:.8rem;border:1px solid #cbd5e1;border-radius:5px;padding:5px;width:100%"/>
-          <div id="edit-preview-{{ q.id }}" style="display:none;margin-top:6px">
-            <img src="" style="max-width:200px;max-height:140px;border-radius:6px;border:1px solid #e2e8f0"/>
-          </div>
-        </div>
-
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:8px">
-          {% for i in range(4) %}
-          <div>
-            <label style="font-size:.75rem;font-weight:600;display:block;margin-bottom:2px">Option {{ ['A','B','C','D'][i] }}</label>
-            <input name="opt{{ i }}" value="{{ q.options[i] if i < q.options|length else '' }}"
-                   style="width:100%;padding:6px;border:1px solid var(--border);border-radius:5px;font-size:.82rem"/>
-          </div>
-          {% endfor %}
-        </div>
-        <div style="margin-bottom:10px">
-          <label style="font-size:.75rem;font-weight:600;display:block;margin-bottom:3px">Correct Answer</label>
-          <select name="answer" style="width:200px;padding:6px;border:1px solid var(--border);border-radius:5px;font-size:.82rem">
-            <option value="0" {{ 'selected' if q.answer == 0 }}>A</option>
-            <option value="1" {{ 'selected' if q.answer == 1 }}>B</option>
-            <option value="2" {{ 'selected' if q.answer == 2 }}>C</option>
-            <option value="3" {{ 'selected' if q.answer == 3 }}>D</option>
-          </select>
-        </div>
-        <div style="display:flex;gap:8px">
-          <button type="submit"
-            style="background:#1d4ed8;color:#fff;border:none;padding:7px 16px;border-radius:5px;cursor:pointer;font-size:.82rem">
-            💾 Save Changes
-          </button>
-          <button type="button" onclick="toggleQEdit({{ q.id }})"
-            style="background:#f1f5f9;color:#475569;border:none;padding:7px 16px;border-radius:5px;cursor:pointer;font-size:.82rem">
-            Cancel
-          </button>
-        </div>
-      </form>
-    </div>
-
+    </form>
   </div>
-  {% endfor %}
 </div>
-{% else %}
-<div style="text-align:center;padding:48px;color:var(--ink3)">
-  <div style="font-size:2.5rem;margin-bottom:8px">📭</div>
-  <div style="font-weight:600">No questions yet</div>
-  <div style="font-size:.85rem">Import from PDF above or add manually</div>
+
+<!-- ── EDIT STUDENT MODAL ─────────────────────────────────── -->
+<div id="edit-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:1000;align-items:center;justify-content:center">
+  <div style="background:#fff;border-radius:12px;padding:28px;width:420px;max-width:95vw;box-shadow:0 20px 60px rgba(0,0,0,.2)">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+      <h3 style="margin:0">Edit Student</h3>
+      <button onclick="document.getElementById('edit-modal').style.display='none'"
+              style="background:none;border:none;font-size:20px;cursor:pointer;color:#888">✕</button>
+    </div>
+    <form method="POST" action="/admin/students">
+      <input type="hidden" name="action" value="edit"/>
+      <input type="hidden" name="user_id" id="edit-user-id"/>
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <div>
+          <label style="font-size:.8rem;font-weight:600;display:block;margin-bottom:3px">Full Name</label>
+          <input name="name" id="edit-name" required
+                 style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;font-size:.85rem"/>
+        </div>
+        <div>
+          <label style="font-size:.8rem;font-weight:600;display:block;margin-bottom:3px">New Password <span style="font-weight:400;color:#888">(leave blank to keep same)</span></label>
+          <input name="password" placeholder="Leave blank to keep unchanged"
+                 style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;font-size:.85rem"/>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+          <div>
+            <label style="font-size:.8rem;font-weight:600;display:block;margin-bottom:3px">Grade</label>
+            <select name="grade" id="edit-grade" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;font-size:.85rem">
+              <option>Grade 3</option><option>Grade 4</option><option>Grade 5</option>
+            </select>
+          </div>
+          <div>
+            <label style="font-size:.8rem;font-weight:600;display:block;margin-bottom:3px">Section</label>
+            <select name="section" id="edit-section" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;font-size:.85rem">
+              <option>A</option><option>B</option><option>C</option><option>D</option>
+            </select>
+          </div>
+        </div>
+        <div style="display:flex;gap:8px;margin-top:6px">
+          <button type="submit" class="btn btn-primary" style="flex:1">💾 Save Changes</button>
+          <button type="button" onclick="document.getElementById('edit-modal').style.display='none'"
+                  class="btn btn-secondary" style="flex:1">Cancel</button>
+        </div>
+      </div>
+    </form>
+  </div>
 </div>
-{% endif %}
 
 <script>
-function toggleQEdit(id) {
-  const view = document.getElementById('qview-' + id);
-  const edit = document.getElementById('qedit-' + id);
-  if (edit.style.display === 'none') {
-    view.style.display = 'none';
-    edit.style.display = 'block';
-  } else {
-    edit.style.display = 'none';
-    view.style.display = 'block';
-  }
+// ── Search & Filter ───────────────────────────────────────────
+function filterStudents() {
+  const search  = document.getElementById('search-input').value.toLowerCase().trim();
+  const grade   = document.getElementById('grade-filter').value;
+  const section = document.getElementById('section-filter').value;
+  const rows    = document.querySelectorAll('.student-row');
+  let visible   = 0;
+
+  rows.forEach(row => {
+    const matchSearch  = !search  || row.dataset.name.includes(search) || row.dataset.username.includes(search);
+    const matchGrade   = !grade   || row.dataset.grade   === grade;
+    const matchSection = !section || row.dataset.section === section;
+    const show = matchSearch && matchGrade && matchSection;
+    row.style.display = show ? '' : 'none';
+    if (show) visible++;
+  });
+
+  document.getElementById('student-count').textContent = visible + ' student' + (visible !== 1 ? 's' : '') + ' shown';
+  document.getElementById('no-results').style.display = visible === 0 ? 'block' : 'none';
 }
 
-function previewImg(input, previewId) {
-  const container = document.getElementById(previewId);
-  const img = container.querySelector('img');
-  if (input.files && input.files[0]) {
-    const reader = new FileReader();
-    reader.onload = e => { img.src = e.target.result; container.style.display = 'block'; };
-    reader.readAsDataURL(input.files[0]);
-  }
+// ── Edit Modal ────────────────────────────────────────────────
+function openEdit(id, name, grade, section) {
+  document.getElementById('edit-user-id').value  = id;
+  document.getElementById('edit-name').value     = name;
+  const gradeEl = document.getElementById('edit-grade');
+  const secEl   = document.getElementById('edit-section');
+  for (let o of gradeEl.options)   o.selected = o.value === grade;
+  for (let o of secEl.options)     o.selected = o.value === section;
+  document.getElementById('edit-modal').style.display = 'flex';
 }
 
-function clearImg(inputId, previewId) {
-  document.getElementById(inputId).value = '';
-  const container = document.getElementById(previewId);
-  container.style.display = 'none';
-  container.querySelector('img').src = '';
-}
+// Close modals on backdrop click
+['add-modal','edit-modal'].forEach(id => {
+  document.getElementById(id).addEventListener('click', function(e) {
+    if (e.target === this) this.style.display = 'none';
+  });
+});
 </script>
 {% endblock %}
